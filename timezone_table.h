@@ -2,6 +2,10 @@
  * "rule" zones carry a POSIX TZ string valid for any instant.
  * "list" zones carry explicit transitions covering 2024-2045.
  * Offsets and abbreviations are resolved at run time by timezone.c. */
+#define TZ_TABLE_IANA_VERSION "2026e"
+#define TZ_TABLE_WINDOW_START 1704067200LL
+#define TZ_TABLE_WINDOW_END 2366841600LL
+
 static const tz_row tz_rows_Africa_Casablanca[8] = {
   {1704067200LL, 3600, "+01"},
   {1710036000LL, 0, "+00"},

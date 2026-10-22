@@ -8,6 +8,7 @@ every zone across the supported window, so a bad table row or a wrong
 transition rule fails without needing a C toolchain.
 """
 import datetime as dt
+import importlib.resources
 import pathlib
 import re
 import unittest
@@ -25,6 +26,42 @@ WINDOW_END = int(dt.datetime(2045, 1, 1, tzinfo=UTC).timestamp())
 ENTRY = re.compile(r'^\s*\{"([^"]+)", (NULL|"[^"]*"), (NULL|tz_rows_\w+), (\d+)\},\s*$')
 ROW = re.compile(r'^\s*\{(-?\d+)LL, (-?\d+), "([^"]*)"\},\s*$')
 BLOCK = re.compile(r'^static const tz_row (tz_rows_\w+)\[\d+\] = \{$')
+HEADER_IANA = re.compile(r'^#define TZ_TABLE_IANA_VERSION "([^"]+)"$')
+
+
+def use_packaged_tzdata():
+    """Pin the reference data to the pip tzdata wheel.
+
+    Linux distributions ship their own /usr/share/zoneinfo, which may be older
+    or newer than the release the table was generated from. Comparing against
+    the packaged wheel keeps the test deterministic across machines and CI.
+    PYTHONTZPATH is cleared as well, because reset_tzpath() alone does not stop
+    zoneinfo from consulting the compiled-in default search path.
+    """
+    try:
+        import tzdata
+    except ImportError:  # pragma: no cover - the workflow installs it
+        return None
+    root = pathlib.Path(str(importlib.resources.files('tzdata').joinpath('zoneinfo')))
+    zoneinfo.reset_tzpath([str(root)])
+    return getattr(tzdata, 'IANA_VERSION', None) or tzdata.__version__
+
+
+PACKAGED_IANA_VERSION = use_packaged_tzdata()
+
+
+def table_header():
+    """Return (iana version, window start, window end) recorded in the header."""
+    version, start, end = None, None, None
+    for line in TABLE.read_text(encoding='ascii').splitlines():
+        hit = HEADER_IANA.match(line)
+        if hit:
+            version = hit.group(1)
+        elif line.startswith('#define TZ_TABLE_WINDOW_START '):
+            start = int(line.split()[-1].removesuffix('LL'))
+        elif line.startswith('#define TZ_TABLE_WINDOW_END '):
+            end = int(line.split()[-1].removesuffix('LL'))
+    return version, start, end
 
 
 def load_table():
@@ -214,6 +251,17 @@ class TestTimezoneTable(unittest.TestCase):
                     epochs = [row[0] for row in payload]
                     self.assertEqual(epochs, sorted(epochs))
                     self.assertEqual(len(epochs), len(set(epochs)))
+
+    def test_header_records_the_generation_parameters(self):
+        version, start, end = table_header()
+        self.assertTrue(version, 'TZ_TABLE_IANA_VERSION missing; regenerate the table')
+        self.assertEqual(start, WINDOW_START)
+        self.assertEqual(end, WINDOW_END)
+        if PACKAGED_IANA_VERSION:
+            self.assertEqual(
+                version, PACKAGED_IANA_VERSION,
+                'table was generated from tzdata %s but the test runs against %s; '
+                'regenerate with tools/gen_tz_table.py' % (version, PACKAGED_IANA_VERSION))
 
     def test_names_are_valid_iana_zones(self):
         available = zoneinfo.available_timezones()

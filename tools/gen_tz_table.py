@@ -35,6 +35,12 @@ def tzif_root():
     return pathlib.Path(str(importlib.resources.files('tzdata').joinpath('zoneinfo')))
 
 
+def iana_version():
+    """The tzdata release the table was generated from, recorded for the tests."""
+    import tzdata
+    return getattr(tzdata, 'IANA_VERSION', None) or tzdata.__version__
+
+
 def read_footer(path):
     raw = path.read_bytes()
     if len(raw) < 5 or raw[:4] != b'TZif':
@@ -318,6 +324,10 @@ def write(rules, lists):
         ' * "rule" zones carry a POSIX TZ string valid for any instant.',
         ' * "list" zones carry explicit transitions covering 2024-2045.',
         ' * Offsets and abbreviations are resolved at run time by timezone.c. */',
+        f'#define TZ_TABLE_IANA_VERSION "{iana_version()}"',
+        f'#define TZ_TABLE_WINDOW_START {int(WINDOW_START.timestamp()):d}LL',
+        f'#define TZ_TABLE_WINDOW_END {int(WINDOW_END.timestamp()):d}LL',
+        '',
     ]
     # Row arrays come first: a forward declaration of a const array would be a
     # tentative definition and conflict with the initializer below.
