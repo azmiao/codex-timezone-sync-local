@@ -5,15 +5,15 @@ SOURCES := plugin.c settings.c events.c json.c rewrite.c timezone.c platform.c
 HEADERS := settings.h events.h json.h rewrite.h timezone.h platform.h dashboard_bundle.h
 
 ifeq ($(OS),Windows_NT)
-LIB := codex-timezone-sync.dll
+LIB := codex-timezone-sync-local.dll
 LDFLAGS := -shared -static-libgcc -lws2_32
 else
 CFLAGS += -fPIC -fstack-protector-strong
 ifeq ($(shell uname -s),Darwin)
-LIB := codex-timezone-sync.dylib
+LIB := codex-timezone-sync-local.dylib
 LDFLAGS := -dynamiclib -pthread
 else
-LIB := codex-timezone-sync.so
+LIB := codex-timezone-sync-local.so
 LDFLAGS := -pthread -shared
 endif
 endif
@@ -34,6 +34,6 @@ test-tz:
 	$(PYTHON) test_timezone_rules.py
 
 clean:
-	rm -f codex-timezone-sync.so codex-timezone-sync.dylib codex-timezone-sync.dll dashboard_bundle.h
+	rm -f codex-timezone-sync-local.so codex-timezone-sync-local.dylib codex-timezone-sync-local.dll dashboard_bundle.h
 
 .PHONY: all clean test test-tz

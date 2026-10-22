@@ -6,8 +6,8 @@
 #include <stddef.h>
 
 // Default data directory inside the CPA container; the env var overrides it.
-#define PLUGIN_DEFAULT_CONFIG "/CLIProxyAPI/data/codex-timezone-sync.config"
-#define PLUGIN_DEFAULT_EVENTS "/CLIProxyAPI/data/codex-timezone-sync.events"
+#define PLUGIN_DEFAULT_CONFIG "/CLIProxyAPI/data/codex-timezone-sync-local.config"
+#define PLUGIN_DEFAULT_EVENTS "/CLIProxyAPI/data/codex-timezone-sync-local.events"
 
 // getenv that also sees the host process environment on Windows, where the
 // MinGW CRT keeps its own copy that the host (Go) never updates.

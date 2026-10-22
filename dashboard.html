@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Codex Timezone Sync</title>
+<title>Codex 离线时区同步</title>
 <style>
 :root{color-scheme:light;--bg:#f4f2ed;--glow:#fff;--card:#fff;--card-2:#faf8f4;--line:#ded7c9;--line-soft:#e7e1d6;--sub:#6d675e;--text:#211d18;--head:#eae5da;--surface:#fff;--sunken:#f7f5f0;--accent:#9a6b12;--accent-soft:#c8952e;--accent-line:#e0c489;--accent-ink:#2a1c05;--green:#17794a;--green-line:#9fd0b5;--green-bg:#e8f6ee;--amber:#8a5f10;--amber-line:#e0c489;--amber-bg:#fbf2dd;--red:#a83728;--red-line:#e8b3a9;--red-bg:#fbeceb;--muted:#8b847a;--track:#cfc9bd;--track-line:#b3ab9c;--knob:#fff;--shadow:#1f1c1712}
 html[data-theme=dark]{color-scheme:dark;--bg:#121110;--glow:#211f1b;--card:#1b1a18;--card-2:#201e1b;--line:#4a4235;--line-soft:#35322e;--sub:#a9a49c;--text:#f1f0ee;--head:#282521;--surface:#141310;--sunken:#100f0e;--accent:#edb858;--accent-soft:#f6c864;--accent-line:#eec06c;--accent-ink:#201408;--green:#43d98b;--green-line:#2f6b4b;--green-bg:#152a20;--amber:#edb858;--amber-line:#6b5a2f;--amber-bg:#2a2415;--red:#f58b79;--red-line:#6b3a2f;--red-bg:#2a1715;--muted:#7d766c;--track:#4a4a4a;--track-line:#6d6d6d;--knob:#fbfbfb;--shadow:#0006}
@@ -91,7 +91,7 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
   <header>
     <div class="symbol" aria-hidden="true"><svg viewBox="0 0 64 64"><circle cx="28" cy="28" r="20"/><path d="M8 28h40M28 8c-13 11-14 28 0 40M28 8c12 9 13 24 6 35"/><circle class="dial" cx="44" cy="44" r="13"/><path d="M44 36v9l6 4"/></svg></div>
     <div>
-      <h1>Codex Timezone Sync</h1>
+      <h1>Codex 离线时区同步</h1>
       <div class="subtitle">离线时区校正 · 选择本地与目标时区即可</div>
     </div>
   </header>
@@ -163,7 +163,7 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
 <script>
 'use strict';
 (() => {
-  const base='/v0/management/plugins/codex-timezone-sync/';
+  const base='/v0/management/plugins/codex-timezone-sync-local/';
   const $=id=>document.getElementById(id);
   let key='';
   let zones=[];

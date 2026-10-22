@@ -5,11 +5,11 @@ import sys
 import zipfile
 
 PLATFORMS = {
-    "linux_amd64": "codex-timezone-sync.so",
-    "linux_arm64": "codex-timezone-sync.so",
-    "darwin_amd64": "codex-timezone-sync.dylib",
-    "darwin_arm64": "codex-timezone-sync.dylib",
-    "windows_amd64": "codex-timezone-sync.dll",
+    "linux_amd64": "codex-timezone-sync-local.so",
+    "linux_arm64": "codex-timezone-sync-local.so",
+    "darwin_amd64": "codex-timezone-sync-local.dylib",
+    "darwin_arm64": "codex-timezone-sync-local.dylib",
+    "windows_amd64": "codex-timezone-sync-local.dll",
 }
 
 def main():
@@ -21,7 +21,7 @@ def main():
     library = pathlib.Path(PLATFORMS[platform])
     if not library.is_file():
         raise SystemExit(f"Missing compiled binary: {library}")
-    output = pathlib.Path("dist") / f"codex-timezone-sync_{version}_{platform}.zip"
+    output = pathlib.Path("dist") / f"codex-timezone-sync-local_{version}_{platform}.zip"
     output.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.write(library, library.name)

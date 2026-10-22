@@ -1,4 +1,4 @@
-// codex-timezone-sync: CLIProxyAPI C ABI v1 request interceptor.
+// codex-timezone-sync-local: CLIProxyAPI C ABI v1 request interceptor.
 //
 // Rewrites the date/timezone context of Codex requests using an offline IANA
 // table. No network access, no host helper service, no state file: the panel
@@ -18,11 +18,11 @@
 #include "dashboard_bundle.h"
 
 #define ABI_VERSION 1
-#define VERSION "0.6.0"
+#define VERSION "0.7.0"
 #define BODY_MAX (12u * 1024u * 1024u)
 #define TOKENS_MAX 4096
-#define ROUTE_PREFIX "/v0/management/plugins/codex-timezone-sync/"
-#define PANEL_ROUTE "/v0/resource/plugins/codex-timezone-sync/panel"
+#define ROUTE_PREFIX "/v0/management/plugins/codex-timezone-sync-local/"
+#define PANEL_ROUTE "/v0/resource/plugins/codex-timezone-sync-local/panel"
 
 typedef int (*plugin_call_fn)(const char *, const unsigned char *, size_t, plugin_buffer *);
 typedef void (*plugin_free_fn)(void *, size_t);
@@ -472,20 +472,20 @@ static void handle_management(const unsigned char *request, size_t length, plugi
 
 static const char *const kRegister =
     "{\"ok\":true,\"result\":{\"schema_version\":1,\"metadata\":{"
-    "\"Name\":\"Codex Timezone Sync\",\"Version\":\"" VERSION "\","
+    "\"Name\":\"Codex 离线时区同步\",\"Version\":\"" VERSION "\","
     "\"Author\":\"azmiao\",\"GitHubRepository\":\"https://github.com/azmiao/codex-timezone-sync\","
     "\"ConfigFields\":[]},"
     "\"capabilities\":{\"request_interceptor\":true,\"management_api\":true}}}";
 
 static const char *const kManagement =
     "{\"ok\":true,\"result\":{\"Routes\":["
-    "{\"Method\":\"GET\",\"Path\":\"/plugins/codex-timezone-sync/status\"},"
-    "{\"Method\":\"PUT\",\"Path\":\"/plugins/codex-timezone-sync/settings\"},"
-    "{\"Method\":\"GET\",\"Path\":\"/plugins/codex-timezone-sync/timezones\"},"
-    "{\"Method\":\"GET\",\"Path\":\"/plugins/codex-timezone-sync/events\"},"
-    "{\"Method\":\"POST\",\"Path\":\"/plugins/codex-timezone-sync/events/clear\"},"
-    "{\"Method\":\"POST\",\"Path\":\"/plugins/codex-timezone-sync/selftest\"}],"
-    "\"Resources\":[{\"Path\":\"/panel\",\"Menu\":\"Codex Timezone Sync\","
+    "{\"Method\":\"GET\",\"Path\":\"/plugins/codex-timezone-sync-local/status\"},"
+    "{\"Method\":\"PUT\",\"Path\":\"/plugins/codex-timezone-sync-local/settings\"},"
+    "{\"Method\":\"GET\",\"Path\":\"/plugins/codex-timezone-sync-local/timezones\"},"
+    "{\"Method\":\"GET\",\"Path\":\"/plugins/codex-timezone-sync-local/events\"},"
+    "{\"Method\":\"POST\",\"Path\":\"/plugins/codex-timezone-sync-local/events/clear\"},"
+    "{\"Method\":\"POST\",\"Path\":\"/plugins/codex-timezone-sync-local/selftest\"}],"
+    "\"Resources\":[{\"Path\":\"/panel\",\"Menu\":\"Codex 离线时区同步\","
     "\"Description\":\"选择本地与目标时区，校正 Codex 请求中的日期与时区\"}]}}";
 
 static int plugin_call(const char *method, const unsigned char *request, size_t length,
