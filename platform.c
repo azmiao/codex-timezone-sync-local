@@ -1,4 +1,11 @@
 // Portability layer implementation. No third-party dependencies.
+// _POSIX_C_SOURCE / _DARWIN_C_SOURCE must be defined before any libc header so
+// that mkstemp, fchmod and friends are declared under -std=c11.
+#ifdef __APPLE__
+#define _DARWIN_C_SOURCE 1
+#elif !defined(_WIN32)
+#define _POSIX_C_SOURCE 200809L
+#endif
 #include "platform.h"
 
 #include <stdio.h>
@@ -7,8 +14,8 @@
 #include <time.h>
 
 #ifdef _WIN32
-#include <io.h>
 #include <fcntl.h>
+#include <io.h>
 #include <sys/stat.h>
 
 // The host process is a Go binary linked against the UCRT, while the plugin may

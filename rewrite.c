@@ -198,9 +198,8 @@ static char *wrap_encoded(const char *prefix, const char *encoded, const char *s
 
 // Insert the context where the Codex request expects instructions.
 static char *insert_context(const char *payload, size_t length, const json_token *tokens,
-                            int count, int instructions, int input, int messages,
+                            int instructions, int input, int messages,
                             const char *context, size_t *out_length) {
-  (void)count;
   char *encoded = json_encode(context);
   if (!encoded) return NULL;
   char *out = NULL;
@@ -382,7 +381,7 @@ rewrite_status rewrite_payload(const char *payload, size_t length, const tz_sett
   char context_buffer[CONTEXT_MAX];
   context_text(&context, context_buffer, sizeof(context_buffer));
   size_t inserted_length = 0;
-  char *inserted = insert_context(payload, length, tokens, count, instructions, input, messages,
+  char *inserted = insert_context(payload, length, tokens, instructions, input, messages,
                                   context_buffer, &inserted_length);
   free(tokens);
   if (!inserted) return REWRITE_FAILED;

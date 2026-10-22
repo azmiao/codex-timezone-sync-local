@@ -37,6 +37,5 @@ char *json_encode(const char *text);
 // Copy [start,end) with `insert` spliced in, replacing `remove` bytes at `at`.
 char *json_splice(const char *source, size_t length, size_t at, size_t remove,
                   const char *insert, size_t insert_length, size_t *out_length);
-int json_contains(const char *text, size_t length, const char *needle);
 
 #endif

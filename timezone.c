@@ -255,11 +255,11 @@ static int dst_active(const tz_rule *rule, long long epoch) {
   // A window can open in one year and close in the next (southern hemisphere),
   // so each candidate start year is paired with its matching end year.
   for (int candidate = year - 1; candidate <= year; candidate++) {
-    long long start = transition_epoch(&rule->start, candidate, rule.std_offset);
-    long long same_year_end = transition_epoch(&rule->end, candidate, rule.dst_offset);
+    long long start = transition_epoch(&rule->start, candidate, rule->std_offset);
+    long long same_year_end = transition_epoch(&rule->end, candidate, rule->dst_offset);
     long long end = start <= same_year_end
         ? same_year_end
-        : transition_epoch(&rule->end, candidate + 1, rule.dst_offset);
+        : transition_epoch(&rule->end, candidate + 1, rule->dst_offset);
     if (epoch >= start && epoch < end) return 1;
   }
   return 0;

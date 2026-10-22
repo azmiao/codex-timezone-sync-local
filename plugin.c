@@ -4,6 +4,7 @@
 // table. No network access, no host helper service, no state file: the panel
 // stores a local zone and a target zone, and the interceptor derives everything
 // else from them. Fail-open everywhere: a request is never blocked.
+#include "events.h"
 #include "json.h"
 #include "platform.h"
 #include "rewrite.h"

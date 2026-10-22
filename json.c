@@ -90,14 +90,6 @@ int json_string_is(const char *text, json_token token, const char *expected) {
          memcmp(text + token.start, expected, length) == 0;
 }
 
-int json_contains(const char *text, size_t length, const char *needle) {
-  size_t size = strlen(needle);
-  if (size == 0 || size > length) return 0;
-  for (size_t i = 0; i + size <= length; i++)
-    if (memcmp(text + i, needle, size) == 0) return 1;
-  return 0;
-}
-
 static int hex_value(char c) {
   if (c >= '0' && c <= '9') return c - '0';
   if (c >= 'a' && c <= 'f') return c - 'a' + 10;
