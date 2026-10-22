@@ -12,9 +12,9 @@ from datetime import datetime, timezone
 
 ROOT = pathlib.Path(__file__).resolve().parent
 LIBRARY = {
-    'win32': 'codex-timezone-sync.dll',
-    'darwin': 'codex-timezone-sync.dylib',
-}.get(sys.platform, 'codex-timezone-sync.so')
+    'win32': 'codex-timezone-sync-local.dll',
+    'darwin': 'codex-timezone-sync-local.dylib',
+}.get(sys.platform, 'codex-timezone-sync-local.so')
 
 
 class Buffer(ct.Structure):
@@ -38,8 +38,8 @@ API_OBJ = API()
 assert LIB.cliproxy_plugin_init(None, ct.byref(API_OBJ)) == 0
 assert API_OBJ.abi_version == 1
 
-PREFIX = '/v0/management/plugins/codex-timezone-sync/'
-PANEL = '/v0/resource/plugins/codex-timezone-sync/panel'
+PREFIX = '/v0/management/plugins/codex-timezone-sync-local/'
+PANEL = '/v0/resource/plugins/codex-timezone-sync-local/panel'
 MARKER = '<environment_context>'
 
 
@@ -96,7 +96,7 @@ class PluginTestCase(unittest.TestCase):
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.config = pathlib.Path(self.temp.name) / 'codex-timezone-sync.config'
+        self.config = pathlib.Path(self.temp.name) / 'codex-timezone-sync-local.config'
         self.config.unlink(missing_ok=True)
         os.environ['CODEX_TZ_CONFIG_FILE'] = str(self.config)
 
@@ -127,19 +127,32 @@ class TestRegistration(PluginTestCase):
         self.assertEqual(result['schema_version'], 1)
         self.assertTrue(result['capabilities']['request_interceptor'])
         self.assertTrue(result['capabilities']['management_api'])
-        self.assertEqual(result['metadata']['Name'], 'Codex Timezone Sync')
-        self.assertTrue(result['metadata']['Version'])
+        self.assertEqual(result['metadata']['Name'], 'Codex 离线时区同步')
+        self.assertEqual(result['metadata']['Version'], '0.7.0')
+        # The store registry and the release workflow carry the same version.
+        self.assertEqual(json.loads((ROOT / 'registry.json').read_text(encoding='utf-8'))
+                         ['plugins'][0]['version'], result['metadata']['Version'])
+
+    def test_plugin_id_matches_local_variant(self):
+        # The host derives the plugin ID from the library file name, so the
+        # binary, the routes and the store entry must agree on one ID.
+        plugin_id = 'codex-timezone-sync-local'
+        self.assertEqual(LIBRARY.rsplit('.', 1)[0], plugin_id)
+        self.assertIn(f'/plugins/{plugin_id}/', PREFIX)
+        self.assertIn(f'/resource/plugins/{plugin_id}/', PANEL)
+        entry = json.loads((ROOT / 'registry.json').read_text(encoding='utf-8'))['plugins'][0]
+        self.assertEqual(entry['id'], plugin_id)
 
     def test_management_routes_are_registered(self):
         routes = call('management.register')['result']['Routes']
         pairs = {(route['Method'], route['Path']) for route in routes}
         for expected in (
-            ('GET', '/plugins/codex-timezone-sync/status'),
-            ('PUT', '/plugins/codex-timezone-sync/settings'),
-            ('GET', '/plugins/codex-timezone-sync/timezones'),
-            ('GET', '/plugins/codex-timezone-sync/events'),
-            ('POST', '/plugins/codex-timezone-sync/events/clear'),
-            ('POST', '/plugins/codex-timezone-sync/selftest'),
+            ('GET', '/plugins/codex-timezone-sync-local/status'),
+            ('PUT', '/plugins/codex-timezone-sync-local/settings'),
+            ('GET', '/plugins/codex-timezone-sync-local/timezones'),
+            ('GET', '/plugins/codex-timezone-sync-local/events'),
+            ('POST', '/plugins/codex-timezone-sync-local/events/clear'),
+            ('POST', '/plugins/codex-timezone-sync-local/selftest'),
         ):
             self.assertIn(expected, pairs)
         resources = call('management.register')['result']['Resources']
@@ -150,7 +163,7 @@ class TestRegistration(PluginTestCase):
         self.assertEqual(result['StatusCode'], 200)
         self.assertEqual(result['Headers']['Content-Type'], ['text/html; charset=utf-8'])
         html = base64.b64decode(result['Body']).decode('utf-8')
-        self.assertIn('Codex Timezone Sync', html)
+        self.assertIn('Codex 离线时区同步', html)
         self.assertIn('<select id="local-zone"', html)
         self.assertIn('<select id="target-zone"', html)
         # No external asset may be required: the panel must work offline.
