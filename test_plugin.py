@@ -159,6 +159,21 @@ class TestRegistration(PluginTestCase):
         self.assertNotIn('<script src=', html)
         self.assertNotIn('<link rel="stylesheet"', html)
 
+    def test_panel_follows_host_theme(self):
+        html = base64.b64decode(call('management.handle', {'Method': 'GET', 'Path': PANEL})['result']['Body']).decode('utf-8')
+        # The panel must not pin itself to one theme: the host can switch at runtime.
+        self.assertNotIn('name="color-scheme" content="dark"', html)
+        self.assertNotIn(':root{color-scheme:dark', html)
+        self.assertIn('name="color-scheme" content="light dark"', html)
+        self.assertIn('color-scheme:light', html)
+        # Dark tokens exist, but only behind the theme attribute.
+        self.assertIn('html[data-theme=dark]{color-scheme:dark', html)
+        # Host attribute, host storage key and system preference are all consulted.
+        self.assertIn("getAttribute('data-theme')", html)
+        self.assertIn('cli-proxy-theme', html)
+        self.assertIn('prefers-color-scheme: dark', html)
+        self.assertIn('MutationObserver', html)
+
     def test_unknown_route_is_404(self):
         result = call('management.handle', {'Method': 'GET', 'Path': '/v0/unknown'})['result']
         self.assertEqual(result['StatusCode'], 404)
