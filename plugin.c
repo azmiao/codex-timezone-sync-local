@@ -473,7 +473,7 @@ static void handle_management(const unsigned char *request, size_t length, plugi
 static const char *const kRegister =
     "{\"ok\":true,\"result\":{\"schema_version\":1,\"metadata\":{"
     "\"Name\":\"Codex 离线时区同步\",\"Version\":\"" VERSION "\","
-    "\"Author\":\"azmiao\",\"GitHubRepository\":\"https://github.com/azmiao/codex-timezone-sync\","
+    "\"Author\":\"azmiao\",\"GitHubRepository\":\"https://github.com/azmiao/codex-timezone-sync-local\","
     "\"ConfigFields\":[]},"
     "\"capabilities\":{\"request_interceptor\":true,\"management_api\":true}}}";
 

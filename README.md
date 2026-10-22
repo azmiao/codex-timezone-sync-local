@@ -31,7 +31,7 @@ v0.5.x 依赖宿主机上的 Python 探测脚本、Unix Socket 辅助服务、`*
 在 CPA 中打开「插件商店」，搜索 **Codex 离线时区同步** 或 **codex-timezone-sync-local**。若官方收录尚未合并，可先添加本仓库提供的第三方商店地址：
 
 ```text
-https://raw.githubusercontent.com/azmiao/codex-timezone-sync/main/registry.json
+https://raw.githubusercontent.com/azmiao/codex-timezone-sync-local/main/registry.json
 ```
 
 或者在 CPA 配置中指定：
@@ -40,7 +40,7 @@ https://raw.githubusercontent.com/azmiao/codex-timezone-sync/main/registry.json
 plugins:
   enabled: true
   store-sources:
-    - "https://raw.githubusercontent.com/azmiao/codex-timezone-sync/main/registry.json"
+    - "https://raw.githubusercontent.com/azmiao/codex-timezone-sync-local/main/registry.json"
   configs:
     codex-timezone-sync-local:
       enabled: true
@@ -131,4 +131,4 @@ checksums.txt
 
 面向 CLIProxyAPI 内置 C ABI 插件宿主，不适用于不支持插件的旧版 CPA。不同 CPA 分支对管理界面、拦截器回调及插件商店的支持可能不同。插件不是地理位置伪装工具，不提供 OAuth 凭据，也不向第三方转发任何请求内容。
 
-当前仓库没有明确授予代码再分发许可；使用前请遵守适用法律及上游服务条款。
+本项目以 [MIT License](LICENSE) 授权。使用前请遵守适用法律及上游服务条款。
