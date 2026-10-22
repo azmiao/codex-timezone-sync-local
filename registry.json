@@ -4,12 +4,12 @@
     {
       "id": "codex-timezone-sync",
       "name": "Codex 时区同步",
-      "description": "根据代理出口 IP 检测时区，自动校正 Codex 请求中的日期与时区；提供中文管理面板、手动检测、请求统计、模型一致性监控和失败请求日志。",
-      "author": "LonelyHerbivore",
-      "version": "0.5.1",
-      "repository": "https://github.com/LonelyHerbivore/codex-timezone-sync",
-      "homepage": "https://github.com/LonelyHerbivore/codex-timezone-sync",
-      "tags": ["codex", "timezone", "request-interceptor", "management"]
+      "description": "内置离线 IANA 时区表，在管理面板选择本地与目标时区即可校正 Codex 请求中的日期与时区；无需宿主机辅助服务、状态文件或外网访问。",
+      "author": "azmiao",
+      "version": "0.6.0",
+      "repository": "https://github.com/azmiao/codex-timezone-sync",
+      "homepage": "https://github.com/azmiao/codex-timezone-sync",
+      "tags": ["codex", "timezone", "request-interceptor", "management", "offline"]
     }
   ]
 }

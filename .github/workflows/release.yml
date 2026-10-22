@@ -12,6 +12,9 @@ on:
 permissions:
   contents: write
 
+env:
+  PLUGIN_VERSION: 0.6.0
+
 jobs:
   build:
     name: Native ABI (${{ matrix.platform }})
@@ -35,7 +38,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install timezone data for cross-platform Python tests
+      - name: Install tzdata for the table validation test
         run: python -m pip install tzdata
       - uses: msys2/setup-msys2@v2
         if: runner.os == 'Windows'
@@ -45,23 +48,25 @@ jobs:
           install: >-
             mingw-w64-ucrt-x86_64-gcc
             make
-      - name: Build and run native plugin tests (Linux/macOS)
+      - name: Validate the committed timezone table against tzdata
+        run: python test_timezone_rules.py
+      - name: Embed management panel
+        run: python embed_ui.py
+      - name: Build and run plugin tests (Linux/macOS)
         if: runner.os != 'Windows'
         run: make test PYTHON=python
-      - name: Embed management panel (Windows)
-        if: runner.os == 'Windows'
-        run: python embed_ui.py
-      - name: Build DLL (Windows UCRT64)
+      - name: Build plugin (Windows UCRT64)
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: gcc -O2 -std=c11 -Wall -Wextra -Werror -shared -o codex-timezone-sync.dll plugin.c -static-libgcc -lws2_32
-      - name: Run native plugin tests (Windows)
+        run: >-
+          gcc -O2 -std=c11 -Wall -Wextra -Werror -shared -o codex-timezone-sync.dll
+          plugin.c settings.c events.c json.c rewrite.c timezone.c platform.c
+          -static-libgcc -lws2_32
+      - name: Run plugin tests (Windows)
         if: runner.os == 'Windows'
         run: python test_plugin.py
-      - name: Test Mihomo egress helper
-        run: python test_egress.py
       - name: Assemble CPA-compatible plugin ZIP
-        run: python package_release.py 0.5.1 ${{ matrix.platform }}
+        run: python package_release.py ${{ env.PLUGIN_VERSION }} ${{ matrix.platform }}
       - uses: actions/upload-artifact@v4
         with:
           name: plugin-${{ matrix.platform }}
@@ -82,7 +87,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version=0.5.1
+          version="${PLUGIN_VERSION}"
           test "${GITHUB_REF_NAME}" = "v${version}"
           cd dist
           for platform in linux_amd64 linux_arm64 darwin_amd64 darwin_arm64 windows_amd64; do
@@ -98,4 +103,4 @@ jobs:
         run: |
           gh release create "${GITHUB_REF_NAME}" dist/*.zip dist/checksums.txt \
             --title "Codex Timezone Sync ${GITHUB_REF_NAME}" \
-            --notes "Codex 时区同步插件。支持 Linux amd64 / arm64、macOS Intel / Apple Silicon 和 Windows amd64。中文管理面板、出口时区检测、改写统计、模型一致性检测及失败请求日志。需要单独安装出口时区检测辅助服务；详情参见 README。"
+            --notes "Codex 时区同步插件。内置离线 IANA 时区表，管理面板直接选择本地与目标时区，无需宿主机辅助服务、状态文件或外网访问。支持 Linux amd64 / arm64、macOS Intel / Apple Silicon 和 Windows amd64。"

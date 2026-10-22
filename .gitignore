@@ -11,10 +11,7 @@ dist/
 .env.*
 !.env.example
 *.log
-*.events
-*.failures
-*.stats
-*.state
+*.config
 *.sock
 *.zip
 *.tar.gz

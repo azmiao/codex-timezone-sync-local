@@ -27,7 +27,9 @@ def main():
         archive.write(library, library.name)
     with zipfile.ZipFile(output) as archive:
         assert archive.namelist() == [library.name]
-        assert archive.getinfo(library.name).file_size > 1024
+        # The bundled timezone table makes the library substantially larger than
+        # a stub; catch a truncated or empty build here rather than at install time.
+        assert archive.getinfo(library.name).file_size > 65536
     print(output)
 
 if __name__ == "__main__":
