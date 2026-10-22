@@ -1,0 +1,74 @@
+// Settings storage: one small key=value file, written atomically with 0600.
+// Read on every request so a panel save takes effect immediately.
+#include "settings.h"
+#include "platform.h"
+#include "timezone.h"
+
+#include <stdio.h>
+#include <string.h>
+
+#define CONFIG_LINE 160
+#define CONFIG_MAX 512
+
+static const char *config_path(void) {
+  const char *path = plugin_getenv("CODEX_TZ_CONFIG_FILE");
+  return path && *path ? path : PLUGIN_DEFAULT_CONFIG;
+}
+
+int settings_zone_valid(const char *zone) {
+  return tz_find(zone) != NULL;
+}
+
+int settings_copy_zone(char *out, size_t cap, const char *value) {
+  if (!out || !value || !*value || strlen(value) >= cap) return 0;
+  if (!settings_zone_valid(value)) return 0;
+  snprintf(out, cap, "%s", value);
+  return 1;
+}
+
+// Match "key=value" and hand back the value; NULL when the key differs.
+static const char *value_of(const char *line, const char *key) {
+  size_t length = strlen(key);
+  if (strncmp(line, key, length) != 0 || line[length] != '=') return NULL;
+  return line + length + 1;
+}
+
+void settings_load(tz_settings *out) {
+  memset(out, 0, sizeof(*out));
+  out->enabled = 1;
+  out->logging = 1;
+  snprintf(out->local_zone, sizeof(out->local_zone), "%s", TZ_DEFAULT_LOCAL);
+  snprintf(out->target_zone, sizeof(out->target_zone), "%s", TZ_DEFAULT_TARGET);
+  FILE *file = fopen(config_path(), "r");
+  if (!file) return;
+  char line[CONFIG_LINE];
+  while (fgets(line, sizeof(line), file)) {
+    line[strcspn(line, "\r\n")] = 0;
+    const char *value = NULL;
+    // A zone name that is unknown or too long is stale configuration: keep the
+    // default rather than starting up with an unusable zone.
+    if ((value = value_of(line, "enabled")) != NULL && value[0] && !value[1])
+      out->enabled = value[0] == '1';
+    else if ((value = value_of(line, "logging")) != NULL && value[0] && !value[1])
+      out->logging = value[0] == '1';
+    else if ((value = value_of(line, "local_zone")) != NULL)
+      settings_copy_zone(out->local_zone, sizeof(out->local_zone), value);
+    else if ((value = value_of(line, "target_zone")) != NULL)
+      settings_copy_zone(out->target_zone, sizeof(out->target_zone), value);
+  }
+  fclose(file);
+}
+
+int settings_save(const tz_settings *cfg) {
+  if (!cfg || !settings_zone_valid(cfg->local_zone) || !settings_zone_valid(cfg->target_zone))
+    return 0;
+  const char *path = config_path();
+  if (strlen(path) > 1024) return 0;
+  char data[CONFIG_MAX];
+  int length = snprintf(data, sizeof(data),
+                        "enabled=%d\nlogging=%d\nlocal_zone=%s\ntarget_zone=%s\n",
+                        cfg->enabled ? 1 : 0, cfg->logging ? 1 : 0,
+                        cfg->local_zone, cfg->target_zone);
+  if (length <= 0 || length >= (int)sizeof(data)) return 0;
+  return plugin_write_file_atomic(path, data, (size_t)length);
+}

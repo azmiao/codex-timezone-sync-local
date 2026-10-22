@@ -1,563 +1,537 @@
 // codex-timezone-sync: CLIProxyAPI C ABI v1 request interceptor.
-// No third-party C libraries; fail-open. Only failed Codex API bodies may be archived.
-// Transport credentials and surrounding management/interceptor headers are excluded.
-#ifdef _WIN32
-#define __USE_MINGW_ANSI_STDIO 1
-#endif
-#ifdef __APPLE__
-#define _DARWIN_C_SOURCE 1
-#elif !defined(_WIN32)
-#define _POSIX_C_SOURCE 200809L
-#endif
-#include <ctype.h>
-#include <limits.h>
-#include <stdint.h>
+//
+// Rewrites the date/timezone context of Codex requests using an offline IANA
+// table. No network access, no host helper service, no state file: the panel
+// stores a local zone and a target zone, and the interceptor derives everything
+// else from them. Fail-open everywhere: a request is never blocked.
+#include "json.h"
+#include "platform.h"
+#include "rewrite.h"
+#include "settings.h"
+#include "timezone.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <sys/stat.h>
-#include "platform_compat.h"
-static void derive_local_date(char *date,size_t cap,const char *offset);
+
 #include "dashboard_bundle.h"
 
 #define ABI_VERSION 1
-#define MAX_REQUEST (12u * 1024u * 1024u)
-#define MAX_TOKENS 150000
-#define TZ_MARKER "[CPAMC_TIMEZONE_V1]"
-#define DEFAULT_STATE "/CLIProxyAPI/data/codex-timezone-sync.state"
+#define VERSION "0.6.0"
+#define BODY_MAX (12u * 1024u * 1024u)
+#define TOKENS_MAX 4096
+#define ROUTE_PREFIX "/v0/management/plugins/codex-timezone-sync/"
+#define PANEL_ROUTE "/v0/resource/plugins/codex-timezone-sync/panel"
 
-typedef struct { void *ptr; size_t len; } cliproxy_buffer;
-typedef int (*host_call_fn)(void *, const char *, const uint8_t *, size_t, cliproxy_buffer *);
-typedef void (*host_free_fn)(void *, size_t);
-typedef struct { uint32_t abi_version; void *host_ctx; host_call_fn call; host_free_fn free_buffer; } cliproxy_host_api;
-typedef int (*plugin_call_fn)(const char *, const uint8_t *, size_t, cliproxy_buffer *);
+typedef int (*plugin_call_fn)(const char *, const unsigned char *, size_t, plugin_buffer *);
 typedef void (*plugin_free_fn)(void *, size_t);
 typedef void (*plugin_shutdown_fn)(void);
-typedef struct { uint32_t abi_version; plugin_call_fn call; plugin_free_fn free_buffer; plugin_shutdown_fn shutdown; } cliproxy_plugin_api;
 
-typedef struct { int start, end, parent, type; } tok;
-enum { OBJECT=1, ARRAY=2, STRING=3, PRIMITIVE=4 };
+typedef struct {
+  unsigned int abi_version;
+  plugin_call_fn call;
+  plugin_free_fn free_buffer;
+  plugin_shutdown_fn shutdown;
+} cliproxy_plugin_api;
 
-static void reply(cliproxy_buffer *res, const char *msg) {
-  if (!res || !msg) return;
-  size_t n = strlen(msg);
-  res->ptr = malloc(n ? n : 1);
-  if (res->ptr) { memcpy(res->ptr, msg, n); res->len = n; }
-}
-
-// Parse only enough of JSON to identify top-level fields while preserving original bytes.
-static int parse_json(const char *s, size_t n, tok *ts, int capacity) {
-  int count=0, parent=-1;
-  for (size_t i=0; i<n;) {
-    unsigned char c=(unsigned char)s[i];
-    if (isspace(c) || c==':' || c==',') { i++; continue; }
-    if (c=='{' || c=='[') {
-      if (count>=capacity) return -1;
-      int id=count++; ts[id]=(tok){(int)i,-1,parent,c=='{'?OBJECT:ARRAY};
-      parent=id; i++; continue;
-    }
-    if (c=='}' || c==']') {
-      if (parent<0 || ts[parent].type!=(c=='}'?OBJECT:ARRAY)) return -1;
-      ts[parent].end=(int)i+1; parent=ts[parent].parent; i++; continue;
-    }
-    if (c=='"') {
-      size_t start=++i;
-      for (;i<n;i++) {
-        if (s[i]=='\\') { if (++i>=n) return -1; continue; }
-        if (s[i]=='"') break;
-        if ((unsigned char)s[i]<32) return -1;
-      }
-      if (i>=n || count>=capacity) return -1;
-      ts[count++]=(tok){(int)start,(int)i,parent,STRING}; i++; continue;
-    }
-    if (c=='-' || isdigit(c) || c=='t' || c=='f' || c=='n') {
-      size_t start=i;
-      while (i<n && s[i]!=',' && s[i]!=']' && s[i]!='}' && !isspace((unsigned char)s[i])) i++;
-      if (start==i || count>=capacity) return -1;
-      ts[count++]=(tok){(int)start,(int)i,parent,PRIMITIVE}; continue;
-    }
-    return -1;
+static void reply(plugin_buffer *out, const char *text) {
+  if (!out || !text) return;
+  size_t length = strlen(text);
+  out->ptr = malloc(length ? length : 1);
+  if (out->ptr) {
+    memcpy(out->ptr, text, length);
+    out->len = length;
   }
-  return parent<0 && count>0 ? count : -1;
 }
 
-static int next_index(const tok *ts, int nt, int id) {
-  int end=ts[id].end; id++;
-  while (id<nt && ts[id].start<end) id++;
-  return id;
-}
-static int eq(const char *s, tok v, const char *name) {
-  return v.type==STRING && (size_t)(v.end-v.start)==strlen(name) &&
-         memcmp(s+v.start,name,strlen(name))==0;
-}
-static int get_field(const char *s, const tok *ts, int nt, int obj, const char *name) {
-  if (obj<0 || ts[obj].type!=OBJECT) return -1;
-  for (int id=obj+1;id<nt && ts[id].start<ts[obj].end;) {
-    if (ts[id].parent!=obj || ts[id].type!=STRING) return -1;
-    int val=id+1;
-    if (val>=nt || ts[val].parent!=obj) return -1;
-    if (eq(s,ts[id],name)) return val;
-    id=next_index(ts,nt,val);
+static const char *base64_chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static char *base64_encode(const unsigned char *data, size_t length) {
+  size_t size = ((length + 2) / 3) * 4;
+  char *out = (char *)malloc(size + 1);
+  if (!out) return NULL;
+  size_t written = 0;
+  for (size_t i = 0; i < length; i += 3) {
+    size_t left = length - i;
+    unsigned a = data[i];
+    unsigned b = left > 1 ? data[i + 1] : 0;
+    unsigned c = left > 2 ? data[i + 2] : 0;
+    out[written++] = base64_chars[a >> 2];
+    out[written++] = base64_chars[((a & 3) << 4) | (b >> 4)];
+    out[written++] = left > 1 ? base64_chars[((b & 15) << 2) | (c >> 6)] : '=';
+    out[written++] = left > 2 ? base64_chars[c & 63] : '=';
   }
+  out[written] = 0;
+  return out;
+}
+
+static int base64_value(unsigned char c) {
+  if (c >= 'A' && c <= 'Z') return c - 'A';
+  if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+  if (c >= '0' && c <= '9') return c - '0' + 52;
+  if (c == '+') return 62;
+  if (c == '/') return 63;
   return -1;
 }
-static int string_is(const char *s, tok t, const char *expected) {
-  size_t len=strlen(expected);
-  return t.type==STRING && (size_t)(t.end-t.start)==len && !memcmp(s+t.start,expected,len);
-}
-static int contains(const char *s, size_t n, const char *needle) {
-  size_t m=strlen(needle);
-  if (m>n) return 0;
-  for (size_t i=0;i+m<=n;i++) if (!memcmp(s+i,needle,m)) return 1;
-  return 0;
+
+static unsigned char *base64_decode(const char *text, size_t length, size_t *out_length) {
+  if (length % 4 || length / 4 * 3 > BODY_MAX) return NULL;
+  size_t padding = (length && text[length - 1] == '=') + (length > 1 && text[length - 2] == '=');
+  size_t size = length / 4 * 3 - padding;
+  unsigned char *out = (unsigned char *)malloc(size + 1);
+  if (!out) return NULL;
+  size_t written = 0;
+  for (size_t i = 0; i < length; i += 4) {
+    int a = base64_value((unsigned char)text[i]);
+    int b = base64_value((unsigned char)text[i + 1]);
+    int c = text[i + 2] == '=' ? 0 : base64_value((unsigned char)text[i + 2]);
+    int d = text[i + 3] == '=' ? 0 : base64_value((unsigned char)text[i + 3]);
+    if (a < 0 || b < 0 || c < 0 || d < 0 ||
+        (i + 4 < length && (text[i + 2] == '=' || text[i + 3] == '=')) ||
+        (text[i + 2] == '=' && text[i + 3] != '=')) {
+      free(out);
+      return NULL;
+    }
+    unsigned value = ((unsigned)a << 18) | ((unsigned)b << 12) | ((unsigned)c << 6) | (unsigned)d;
+    if (written < size) out[written++] = (unsigned char)(value >> 16);
+    if (written < size) out[written++] = (unsigned char)(value >> 8);
+    if (written < size) out[written++] = (unsigned char)value;
+  }
+  out[size] = 0;
+  *out_length = size;
+  return out;
 }
 
-static int b64val(unsigned char c) {
-  if (c>='A'&&c<='Z') return c-'A';
-  if (c>='a'&&c<='z') return c-'a'+26;
-  if (c>='0'&&c<='9') return c-'0'+52;
-  if (c=='+') return 62;
-  if (c=='/') return 63;
-  return -1;
-}
-static unsigned char *b64decode(const char *s, size_t n, size_t *out_n) {
-  if (n%4 || n/4*3 > MAX_REQUEST) return NULL;
-  size_t pad=(n && s[n-1]=='=')+(n>1 && s[n-2]=='=');
-  size_t size=n/4*3-pad;
-  unsigned char *out=malloc(size+1); if (!out) return NULL;
-  size_t j=0;
-  for (size_t i=0;i<n;i+=4) {
-    int a=b64val(s[i]),b=b64val(s[i+1]);
-    int c=s[i+2]=='='?0:b64val(s[i+2]);
-    int d=s[i+3]=='='?0:b64val(s[i+3]);
-    if (a<0||b<0||c<0||d<0 || (i+4<n && (s[i+2]=='='||s[i+3]=='=')) ||
-       (s[i+2]=='='&&s[i+3]!='=')) {free(out);return NULL;}
-    uint32_t x=((uint32_t)a<<18)|((uint32_t)b<<12)|((uint32_t)c<<6)|(uint32_t)d;
-    if(j<size) out[j++]=(unsigned char)(x>>16);
-    if(j<size) out[j++]=(unsigned char)(x>>8);
-    if(j<size) out[j++]=(unsigned char)x;
-  }
-  out[size]=0; *out_n=size;return out;
-}
-static char *b64encode(const unsigned char *s, size_t n) {
-  static const char abc[]="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  if(n>(SIZE_MAX-4)/4*3) return NULL;
-  size_t size=((n+2)/3)*4;
-  char *out=malloc(size+1);if(!out)return NULL;
-  size_t j=0;
-  for(size_t i=0;i<n;i+=3) {
-    size_t left=n-i;uint32_t a=s[i],b=left>1?s[i+1]:0,c=left>2?s[i+2]:0;
-    out[j++]=abc[a>>2];out[j++]=abc[((a&3)<<4)|(b>>4)];
-    out[j++]=left>1?abc[((b&15)<<2)|(c>>6)]:'=';
-    out[j++]=left>2?abc[c&63]:'=';
-  }
-  out[j]=0;return out;
-}
-
-static int safe_field(const char *s, const char *allowed, size_t maxlen) {
-  size_t n=strlen(s);if(n==0||n>maxlen)return 0;
-  for(size_t i=0;i<n;i++)if(!strchr(allowed,s[i]))return 0;
-  return 1;
-}
-static int timezone_context(char *dst,size_t cap) {
-  char zone[80]="",date[18]="",abbr[18]="",offset[12]="";
-  const char *allowed_zone="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/_+-";
-  const char *allowed_abbr="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-";
-  const char *state=getenv("CODEX_TZ_STATE_FILE");
-  if(!state || !*state)state=DEFAULT_STATE;
-  struct stat st;
-  // Fail open if the egress observation is missing or older than two hours.
-  // This avoids incorrectly asserting a timezone after a proxy node switch.
-  if(stat(state,&st)!=0 || time(NULL)-st.st_mtime>7200 || st.st_mtime>time(NULL)+60) return 0;
-  FILE *fp=fopen(state,"r");
-  if(!fp)return 0;
-  char line[256];
-  int loaded=0;
-  if(fgets(line,sizeof(line),fp)) {
-    char tmpz[80],tmpd[18],tmpa[18],tmpo[12];
-    if(sscanf(line,"%79[^|]|%17[^|]|%17[^|]|%11[^\n]",tmpz,tmpd,tmpa,tmpo)==4 &&
-      safe_field(tmpz,allowed_zone,79) &&
-      safe_field(tmpd,"0123456789-",17) && strlen(tmpd)==10 &&
-      safe_field(tmpa,allowed_abbr,17) && safe_field(tmpo,"0123456789:+-",11)) {
-      strcpy(zone,tmpz);strcpy(date,tmpd);strcpy(abbr,tmpa);strcpy(offset,tmpo);
-      loaded=1;
-    }
-  }
-  fclose(fp);
-  if(!loaded)return 0;
-  derive_local_date(date,sizeof(date),offset);
-  snprintf(dst,cap,TZ_MARKER "\nCurrent date: %s\nCurrent timezone: %s (%s, UTC%s).\nUse this date/timezone for environment context unless the user explicitly specifies another timezone.",date,zone,abbr,offset);
-  return 1;
-}
-
-// splice a literal ASCII addition, preserving all other JSON bytes.
-static char *splice(const char *src,size_t n,size_t where,size_t remove,const char *add,size_t m,size_t *out_n) {
-  if(where>n||remove>n-where||n-remove>MAX_REQUEST-m)return NULL;
-  size_t size=n-remove+m;
-  char *dst=malloc(size+1);if(!dst)return NULL;
-  memcpy(dst,src,where);memcpy(dst+where,add,m);
-  memcpy(dst+where+m,src+where+remove,n-where-remove);
-  dst[size]=0;*out_n=size;return dst;
-}
-static int normalize_existing_environments(const char *,size_t,char **,size_t *);
-static char *rewrite_payload(const char *payload,size_t len,size_t *new_len) {
-  if(len==0||len>MAX_REQUEST)return NULL;
-  tok *ts=malloc(MAX_TOKENS*sizeof(tok));if(!ts)return NULL;
-  int nt=parse_json(payload,len,ts,MAX_TOKENS);
-  if(nt<1||ts[0].type!=OBJECT){free(ts);return NULL;}
-  char context[280];if(!timezone_context(context,sizeof(context))){free(ts);return NULL;}
-  char *normalized=NULL;int env_status=normalize_existing_environments(payload,len,&normalized,new_len);
-  if(env_status!=0){free(ts);return env_status==1?normalized:NULL;}
-  char *answer=NULL;
-  int instructions=get_field(payload,ts,nt,0,"instructions");
-  int input=get_field(payload,ts,nt,0,"input");
-  int messages=get_field(payload,ts,nt,0,"messages");
-  if(instructions>=0&&ts[instructions].type==STRING) {
-    int start=ts[instructions].start,end=ts[instructions].end;
-    if(!contains(payload+start,(size_t)(end-start),TZ_MARKER)) {
-      size_t n=strlen(context)+10;char *add=malloc(n);
-      if(add){snprintf(add,n,"\n\n%s",context);
-        // context has literal newlines; convert them to JSON escapes.
-        size_t m=strlen(add), outcap=m*2+1;char *escaped=malloc(outcap);
-        if(escaped){size_t k=0;for(size_t i=0;i<m;i++){
-          if(add[i]=='\n'){escaped[k++]='\\';escaped[k++]='n';}
-          else if(add[i]=='"'||add[i]=='\\'){escaped[k++]='\\';escaped[k++]=add[i];}
-          else escaped[k++]=add[i];}
-          answer=splice(payload,len,(size_t)end,0,escaped,k,new_len);free(escaped);
-        }free(add);
-      }
-    }
-  } else if(instructions>=0 && ts[instructions].type==PRIMITIVE &&
-            (size_t)(ts[instructions].end-ts[instructions].start)==4 &&
-            !memcmp(payload+ts[instructions].start,"null",4)) {
-    char *escaped=malloc(strlen(context)*2+4);
-    if(escaped){size_t k=0;escaped[k++]='"';
-      for(const char *c=context;*c;c++){if(*c=='\n'){escaped[k++]='\\';escaped[k++]='n';}
-      else if(*c=='"'||*c=='\\'){escaped[k++]='\\';escaped[k++]=*c;}
-      else escaped[k++]=*c;}
-      escaped[k++]='"';
-      answer=splice(payload,len,(size_t)ts[instructions].start,4,escaped,k,new_len);free(escaped);
-    }
-  } else if(instructions>=0) {
-    // Do not insert duplicate instructions when an unexpected type exists.
-  } else if(input>=0 && ts[input].type==ARRAY) {
-    // Native Responses input; insert top-level instructions without modifying messages.
-    char *escaped=malloc(strlen(context)*2+32);
-    if(escaped){size_t k=0;memcpy(escaped,"\"instructions\":\"",16);k=16;
-      for(const char *c=context;*c;c++){if(*c=='\n'){escaped[k++]='\\';escaped[k++]='n';}
-      else if(*c=='"'||*c=='\\'){escaped[k++]='\\';escaped[k++]=*c;}
-      else escaped[k++]=*c;}
-      escaped[k++]='"';escaped[k++]=',';
-      answer=splice(payload,len,(size_t)ts[0].start+1,0,escaped,k,new_len);free(escaped);
-    }
-  } else if(messages>=0 && ts[messages].type==ARRAY) {
-    // Chat-completions routed to Codex: prepend one developer message.
-    char *escaped=malloc(strlen(context)*2+100);
-    if(escaped){size_t k=0;const char *prefix="{\"role\":\"developer\",\"content\":\"";
-      memcpy(escaped,prefix,strlen(prefix));k=strlen(prefix);
-      for(const char *c=context;*c;c++){if(*c=='\n'){escaped[k++]='\\';escaped[k++]='n';}
-      else if(*c=='"'||*c=='\\'){escaped[k++]='\\';escaped[k++]=*c;}
-      else escaped[k++]=*c;}
-      escaped[k++]='"';escaped[k++]='}';
-      // Check whether the messages array is empty; comma only when nonempty.
-      size_t at=(size_t)ts[messages].start+1;
-      size_t check=at;while(check<len&&isspace((unsigned char)payload[check]))check++;
-      if(check<len&&payload[check]!=']')escaped[k++]=',';
-      answer=splice(payload,len,at,0,escaped,k,new_len);free(escaped);
-    }
-  }
-  free(ts);return answer;
-}
-
-#include "settings.inc"
-#include "timezone_normalize.inc"
-
-static void http_response(cliproxy_buffer *out,int code,const char *kind,const char *body) {
-  char *b64=b64encode((const unsigned char *)body,strlen(body));
-  if(!b64)return;
-  size_t cap=strlen(b64)+220;
-  char *msg=malloc(cap);
-  if(msg) {
-    snprintf(msg,cap,"{\"ok\":true,\"result\":{\"StatusCode\":%d,\"Headers\":{\"Content-Type\":[\"%s; charset=utf-8\"],\"Cache-Control\":[\"no-store\"]},\"Body\":\"%s\"}}",code,kind,b64);
-    reply(out,msg);free(msg);
-  }
-  free(b64);
-}
-
-#include "events.inc"
-#include "model_monitor.inc"
-#include "stats.inc"
-#include "refresh_bridge.inc"
-#include "failures.inc"
-
-static void handle_clear_activity(cliproxy_buffer *out) {
-  // Clear only the activity stream and volatile model observations.
-  int fd=open(log_path(),O_WRONLY|O_CREAT|O_NOFOLLOW,0600);
-  if(fd<0) {http_response(out,500,"application/json","{\"ok\":false,\"reason\":\"unable to open events\"}");return;}
-  struct stat st;
-  int ok=flock(fd,LOCK_EX)==0 && fstat(fd,&st)==0 && S_ISREG(st.st_mode) && ftruncate(fd,0)==0;
-  if(ok)fsync(fd);
-  flock(fd,LOCK_UN);close(fd);
-  if(!ok) {http_response(out,500,"application/json","{\"ok\":false,\"reason\":\"unable to clear events\"}");return;}
-  plugin_mutex_lock(&model_mutex);
-  memset(model_history,0,sizeof(model_history));
-  model_head=0;model_used=0;
-  plugin_mutex_unlock(&model_mutex);
-  http_response(out,200,"application/json","{\"ok\":true}");
-}
-
-static void intercept(const uint8_t *request,size_t len,cliproxy_buffer *response) {
-  if(!request||!len||len>MAX_REQUEST){reply(response,"{\"ok\":true,\"result\":{}}");return;}
-  const char *src=(const char *)request;
-  tok *ts=malloc(MAX_TOKENS*sizeof(tok));if(!ts){reply(response,"{\"ok\":true,\"result\":{}}");return;}
-  int nt=parse_json(src,len,ts,MAX_TOKENS);
-  if(nt<1||ts[0].type!=OBJECT){free(ts);reply(response,"{\"ok\":true,\"result\":{}}");return;}
-  int obj=0;
-  int wrapped=get_field(src,ts,nt,obj,"request");
-  if(wrapped>=0&&ts[wrapped].type==OBJECT)obj=wrapped;
-  int to=get_field(src,ts,nt,obj,"ToFormat");
-  if(to<0)to=get_field(src,ts,nt,obj,"to_format");
-  int body=get_field(src,ts,nt,obj,"Body");
-  if(body<0)body=get_field(src,ts,nt,obj,"body");
-  if(to<0||!string_is(src,ts[to],"codex")) {
-    free(ts);reply(response,"{\"ok\":true,\"result\":{}}");return;
-  }
-  if(body<0||ts[body].type!=STRING) {
-    if(load_settings().enabled) {
-      stats_update(0,1,0,NULL,NULL);
-      persist_failure("invalid_body","",0);
-    }
-    free(ts);reply(response,"{\"ok\":true,\"result\":{}}");return;
-  }
-  int sync_enabled=load_settings().enabled;
-  const char *encoded=src+ts[body].start;size_t encoded_len=(size_t)(ts[body].end-ts[body].start);
-  size_t payload_len=0;unsigned char *payload=b64decode(encoded,encoded_len,&payload_len);
-  char before_zone[80]="";
-  if(payload){extract_original_zone((const char *)payload,payload_len,before_zone);monitor_request(src,ts,nt,obj,(const char *)payload,payload_len);}
-  free(ts);
-  if(!sync_enabled || !payload) {
-    if(sync_enabled) {
-      stats_update(0,1,0,NULL,NULL);
-      persist_failure("invalid_base64",encoded,encoded_len);
-    }
-    free(payload);reply(response,"{\"ok\":true,\"result\":{}}");return;
-  }
-  int already=contains((char *)payload,payload_len,TZ_MARKER);
-  size_t next_len=0;char *rewritten=rewrite_payload((char *)payload,payload_len,&next_len);
-  if(!rewritten) {
-    if(!already) {
-      sync_state current;
-      stats_update(0,1,0,NULL,NULL);
-      persist_failure(load_state(&current)?"rewrite_failed":"state_unavailable",
-        (const char *)payload,payload_len);
-    }
-    free(payload);log_event_detail("skipped",before_zone);
-    reply(response,"{\"ok\":true,\"result\":{}}");return;
-  }
-  char *next_b64=b64encode((unsigned char *)rewritten,next_len);free(rewritten);
-  if(!next_b64){
-    stats_update(0,1,0,NULL,NULL);persist_failure("encode_failed",(const char *)payload,payload_len);
-    free(payload);reply(response,"{\"ok\":true,\"result\":{}}");return;
-  }
-  size_t n=strlen(next_b64)+64;char *result=malloc(n);
-  if(result) {
-    snprintf(result,n,"{\"ok\":true,\"result\":{\"Body\":\"%s\"}}",next_b64);
-    reply(response,result);
-    if(response->ptr){stats_update(1,0,0,NULL,NULL);log_event_detail("rewritten",before_zone);}
-    else {
-      stats_update(0,1,0,NULL,NULL);persist_failure("response_failed",(const char *)payload,payload_len);
-    }
-    free(result);
-  } else {
-    stats_update(0,1,0,NULL,NULL);persist_failure("response_failed",(const char *)payload,payload_len);
-  }
-  free(payload);
-  free(next_b64);
-}
-
-// CPA exposes menu resources without auth. Never place credentials in this page.
-static void handle_status(cliproxy_buffer *out) {
-  sync_settings cfg=load_settings();sync_state state;
-  int available=load_state(&state);
-  char json[768];
-  snprintf(json,sizeof(json),
-    "{\"ok\":true,\"available\":%s,\"timezone\":\"%s\",\"date\":\"%s\",\"abbreviation\":\"%s\",\"offset\":\"%s\",\"ip\":\"%s\",\"age_seconds\":%ld,\"settings\":{\"enabled\":%s,\"logging\":%s,\"debug\":%s}}",
-    available?"true":"false",available?state.zone:"",available?state.date:"",available?state.abbr:"",available?state.offset:"",available?state.ip:"",available?state.age:-1L,
-    cfg.enabled?"true":"false",cfg.logging?"true":"false",cfg.debug?"true":"false");
-  http_response(out,200,"application/json",json);
-}
-static void handle_selftest(cliproxy_buffer *out) {
-  if(!load_settings().enabled) {
-    http_response(out,409,"application/json","{\"ok\":false,\"reason\":\"同步功能已关闭\"}");return;
-  }
-  sync_state state;
-  if(!load_state(&state)) {
-    http_response(out,503,"application/json","{\"ok\":false,\"reason\":\"出口时区状态缺失或已过期\"}");return;
-  }
-  const char *sample="{\"model\":\"codex-selftest\",\"input\":[]}";
-  size_t out_len=0;
-  char *converted=rewrite_payload(sample,strlen(sample),&out_len);
-  int ok=converted && contains(converted,out_len,TZ_MARKER) && contains(converted,out_len,state.zone);
-  free(converted);
-  if(!ok) {
-    http_response(out,500,"application/json","{\"ok\":false,\"reason\":\"请求重写自检失败\"}");return;
-  }
-  char json[160];
-  snprintf(json,sizeof(json),"{\"ok\":true,\"timezone\":\"%s\",\"mode\":\"dry-run\"}",state.zone);
-  http_response(out,200,"application/json",json);
-}
-static void handle_settings(const char *raw,const tok *ts,int body,cliproxy_buffer *out) {
-  if(body<0 || ts[body].type!=STRING) {
-    http_response(out,400,"application/json","{\"ok\":false,\"error\":\"missing JSON body\"}");return;
-  }
-  size_t n=0;
-  const char *data=raw+ts[body].start;
-  size_t encoded_len=(size_t)(ts[body].end-ts[body].start);
-  unsigned char *decoded=b64decode(data,encoded_len,&n);
-  sync_settings cfg=load_settings();
-  if(!decoded || n>2048 || !parse_settings_body((char *)decoded,n,&cfg)) {
-    free(decoded);
-    http_response(out,400,"application/json","{\"ok\":false,\"error\":\"invalid settings\"}");return;
-  }
-  free(decoded);
-  if(!save_settings(cfg)) {
-    http_response(out,500,"application/json","{\"ok\":false,\"error\":\"unable to save configuration\"}");return;
-  }
-  handle_status(out);
-}
-static void management_page(const uint8_t *request,size_t request_len,cliproxy_buffer *response) {
-  if (!request || !request_len || request_len>MAX_REQUEST) {
-    reply(response,"{\"ok\":false,\"error\":{\"code\":\"invalid_request\"}}");return;
-  }
-  const char *raw=(const char *)request;
-  tok *ts=malloc(MAX_TOKENS*sizeof(tok));
-  if (!ts) return;
-  int nt=parse_json(raw,request_len,ts,MAX_TOKENS);
-  int obj=0;
-  if (nt<1 || ts[0].type!=OBJECT) {free(ts);return;}
-  int wrap=get_field(raw,ts,nt,obj,"request");
-  if (wrap>=0 && ts[wrap].type==OBJECT)obj=wrap;
-  int path=get_field(raw,ts,nt,obj,"Path");
-  if (path<0)path=get_field(raw,ts,nt,obj,"path");
-  int verb=get_field(raw,ts,nt,obj,"Method");
-  if (verb<0)verb=get_field(raw,ts,nt,obj,"method");
-  int body=get_field(raw,ts,nt,obj,"Body");
-  if(body<0)body=get_field(raw,ts,nt,obj,"body");
-  if(path>=0 && verb>=0 && string_is(raw,ts[verb],"GET") &&
-    string_is(raw,ts[path],"/v0/management/plugins/codex-timezone-sync/status")) {
-    free(ts);handle_status(response);return;
-  }
-  if(path>=0 && verb>=0 && string_is(raw,ts[verb],"GET") &&
-    string_is(raw,ts[path],"/v0/management/plugins/codex-timezone-sync/models")) {
-    free(ts);handle_model_records(response);return;
-  }
-  if(path>=0 && verb>=0 && string_is(raw,ts[verb],"GET") &&
-    string_is(raw,ts[path],"/v0/management/plugins/codex-timezone-sync/logs")) {
-    free(ts);handle_logs(response);return;
-  }
-  if(path>=0 && verb>=0 && string_is(raw,ts[verb],"GET") &&
-    string_is(raw,ts[path],"/v0/management/plugins/codex-timezone-sync/stats")) {
-    free(ts);handle_stats(response);return;
-  }
-  if(path>=0 && verb>=0 && string_is(raw,ts[verb],"POST") &&
-    string_is(raw,ts[path],"/v0/management/plugins/codex-timezone-sync/stats/clear")) {
-    free(ts);handle_clear_stats(response);return;
-  }
-  if(path>=0 && verb>=0 && string_is(raw,ts[verb],"POST") &&
-    string_is(raw,ts[path],"/v0/management/plugins/codex-timezone-sync/activity/clear")) {
-    free(ts);handle_clear_activity(response);return;
-  }
-  if(path>=0 && verb>=0 && string_is(raw,ts[verb],"POST") &&
-    string_is(raw,ts[path],"/v0/management/plugins/codex-timezone-sync/egress/refresh")) {
-    free(ts);handle_probe_egress(response);return;
-  }
-  if(path>=0 && verb>=0 && string_is(raw,ts[verb],"GET") &&
-    string_is(raw,ts[path],"/v0/management/plugins/codex-timezone-sync/failures")) {
-    free(ts);handle_failures(response);return;
-  }
-  if(path>=0 && verb>=0 && string_is(raw,ts[verb],"POST") &&
-    string_is(raw,ts[path],"/v0/management/plugins/codex-timezone-sync/failures/view")) {
-    handle_failure_view(raw,ts,body,response);free(ts);return;
-  }
-  if(path>=0 && verb>=0 && string_is(raw,ts[verb],"POST") &&
-    string_is(raw,ts[path],"/v0/management/plugins/codex-timezone-sync/failures/clear")) {
-    free(ts);handle_clear_failures(response);return;
-  }
-  if(path>=0 && verb>=0 && string_is(raw,ts[verb],"POST") &&
-    string_is(raw,ts[path],"/v0/management/plugins/codex-timezone-sync/selftest")) {
-    free(ts);handle_selftest(response);return;
-  }
-  if(path>=0 && verb>=0 && string_is(raw,ts[verb],"PUT") &&
-    string_is(raw,ts[path],"/v0/management/plugins/codex-timezone-sync/settings")) {
-    handle_settings(raw,ts,body,response);free(ts);return;
-  }
-  int valid=(path>=0 && verb>=0 && string_is(raw,ts[verb],"GET") &&
-             string_is(raw,ts[path],"/v0/resource/plugins/codex-timezone-sync/panel"));
-  free(ts);
-  if (!valid) {
-    reply(response,"{\"ok\":true,\"result\":{\"StatusCode\":404,\"Headers\":{\"Content-Type\":[\"text/plain; charset=utf-8\"]},\"Body\":\"Tm90IGZvdW5k\"}}");
-    return;
-  }
-  char *encoded=b64encode(dashboard_html,dashboard_html_size);
-  if (!encoded)return;
-  size_t cap=strlen(encoded)+200;
-  char *json=malloc(cap);
-  if(json) {
-    snprintf(json,cap,"{\"ok\":true,\"result\":{\"StatusCode\":200,\"Headers\":{\"Content-Type\":[\"text/html; charset=utf-8\"],\"Cache-Control\":[\"no-store\"],\"X-Content-Type-Options\":[\"nosniff\"]},\"Body\":\"%s\"}}",encoded);
-    reply(response,json);
-    free(json);
+// Respond with a JSON body the CPA management frontend can render directly.
+static void json_response(plugin_buffer *out, int status, const char *body) {
+  char *encoded = base64_encode((const unsigned char *)body, strlen(body));
+  if (!encoded) return;
+  size_t capacity = strlen(encoded) + 220;
+  char *message = (char *)malloc(capacity);
+  if (message) {
+    snprintf(message, capacity,
+             "{\"ok\":true,\"result\":{\"StatusCode\":%d,\"Headers\":{"
+             "\"Content-Type\":[\"application/json; charset=utf-8\"],"
+             "\"Cache-Control\":[\"no-store\"]},\"Body\":\"%s\"}}",
+             status, encoded);
+    reply(out, message);
+    free(message);
   }
   free(encoded);
 }
 
-static int plugin_call(const char *method,const uint8_t *request,size_t request_len,cliproxy_buffer *response) {
-  if(response){response->ptr=NULL;response->len=0;}
-  if(!method||!response)return 1;
-  if(!strcmp(method,"plugin.register")||!strcmp(method,"plugin.reconfigure")) {
-    reply(response,"{\"ok\":true,\"result\":{\"schema_version\":1,\"metadata\":{\"Name\":\"Codex Timezone Sync\",\"Version\":\"0.5.1\",\"Author\":\"LonelyHerbivore\",\"GitHubRepository\":\"https://github.com/LonelyHerbivore/codex-timezone-sync\",\"ConfigFields\":[]},\"capabilities\":{\"request_interceptor\":true,\"management_api\":true,\"response_interceptor\":true,\"response_stream_interceptor\":true,\"websocket_response_observer\":true}}}");
-    return 0;
+static void html_response(plugin_buffer *out, const unsigned char *html, size_t length) {
+  char *encoded = base64_encode(html, length);
+  if (!encoded) return;
+  size_t capacity = strlen(encoded) + 220;
+  char *message = (char *)malloc(capacity);
+  if (message) {
+    snprintf(message, capacity,
+             "{\"ok\":true,\"result\":{\"StatusCode\":200,\"Headers\":{"
+             "\"Content-Type\":[\"text/html; charset=utf-8\"],"
+             "\"Cache-Control\":[\"no-store\"],"
+             "\"X-Content-Type-Options\":[\"nosniff\"]},\"Body\":\"%s\"}}",
+             encoded);
+    reply(out, message);
+    free(message);
   }
-  if(!strcmp(method,"management.register")) {
-    reply(response,
-      "{\"ok\":true,\"result\":{\"Routes\":["
-      "{\"Method\":\"GET\",\"Path\":\"/plugins/codex-timezone-sync/status\"},"
-      "{\"Method\":\"PUT\",\"Path\":\"/plugins/codex-timezone-sync/settings\"},"
-      "{\"Method\":\"GET\",\"Path\":\"/plugins/codex-timezone-sync/logs\"},"
-      "{\"Method\":\"GET\",\"Path\":\"/plugins/codex-timezone-sync/models\"},"
-      "{\"Method\":\"GET\",\"Path\":\"/plugins/codex-timezone-sync/stats\"},"
-      "{\"Method\":\"POST\",\"Path\":\"/plugins/codex-timezone-sync/stats/clear\"},"
-      "{\"Method\":\"POST\",\"Path\":\"/plugins/codex-timezone-sync/activity/clear\"},"
-      "{\"Method\":\"POST\",\"Path\":\"/plugins/codex-timezone-sync/egress/refresh\"},"
-      "{\"Method\":\"GET\",\"Path\":\"/plugins/codex-timezone-sync/failures\"},"
-      "{\"Method\":\"POST\",\"Path\":\"/plugins/codex-timezone-sync/failures/view\"},"
-      "{\"Method\":\"POST\",\"Path\":\"/plugins/codex-timezone-sync/failures/clear\"},"
-      "{\"Method\":\"POST\",\"Path\":\"/plugins/codex-timezone-sync/selftest\"}],"
-      "\"Resources\":[{\"Path\":\"/panel\",\"Menu\":\"Codex Timezone Sync\",\"Description\":\"Codex 请求时区同步状态与控制\"}]}}");
-    return 0;
-  }
-  if(!strcmp(method,"management.handle")) {management_page(request,request_len,response);return 0;}
-  if(!strcmp(method,"response.intercept_after") ||
-     !strcmp(method,"response.intercept_stream_chunk") ||
-     !strcmp(method,"websocket.response_event")) {
-    monitor_response(method,request,request_len);
-    reply(response,"{\"ok\":true,\"result\":{}}");return 0;
-  }
-  if(!strcmp(method,"request.intercept_after")) {intercept(request,request_len,response);return 0;}
-  if(!strcmp(method,"request.intercept_before")) {reply(response,"{\"ok\":true,\"result\":{}}");return 0;}
-  reply(response,"{\"ok\":false,\"error\":{\"code\":\"unknown_method\",\"message\":\"unsupported method\"}}");return 0;
+  free(encoded);
 }
-static void plugin_free(void *p,size_t n){(void)n;free(p);}
-static void plugin_shutdown(void){}
+
+// ---------------------------------------------------------------------------
+// Request interception
+// ---------------------------------------------------------------------------
+
+static const char *const kToFormat[] = {"ToFormat", "to_format", NULL};
+static const char *const kBody[] = {"Body", "body", NULL};
+
+static void handle_request(const unsigned char *request, size_t length, plugin_buffer *response) {
+  if (!request || !length || length > BODY_MAX) return;
+  const char *raw = (const char *)request;
+  json_token *tokens = (json_token *)malloc(TOKENS_MAX * sizeof(json_token));
+  if (!tokens) return;
+  int count = json_parse(raw, length, tokens, TOKENS_MAX);
+  if (count < 1 || tokens[0].type != JSON_OBJECT) {
+    free(tokens);
+    return;
+  }
+  int object = 0;
+  int wrapped = json_field(raw, tokens, count, object, "request");
+  if (wrapped >= 0 && tokens[wrapped].type == JSON_OBJECT) object = wrapped;
+  int to_format = json_field_any(raw, tokens, count, object, kToFormat);
+  if (to_format < 0 || !json_string_is(raw, tokens[to_format], "codex")) {
+    free(tokens);
+    return;
+  }
+  int body = json_field_any(raw, tokens, count, object, kBody);
+  if (body < 0 || tokens[body].type != JSON_STRING) {
+    free(tokens);
+    return;
+  }
+  tz_settings cfg;
+  settings_load(&cfg);
+  if (!cfg.enabled) {
+    free(tokens);
+    return;
+  }
+  size_t payload_length = 0;
+  unsigned char *payload = base64_decode(raw + tokens[body].start,
+                                         (size_t)(tokens[body].end - tokens[body].start),
+                                         &payload_length);
+  free(tokens);
+  if (!payload) {
+    events_add("failed", "", cfg.target_zone, "");
+    return;
+  }
+
+  char origin[64];
+  rewrite_origin_zone((const char *)payload, payload_length, origin, sizeof(origin));
+
+  char *rewritten = NULL;
+  size_t rewritten_length = 0;
+  rewrite_context used;
+  memset(&used, 0, sizeof(used));
+  rewrite_status status = rewrite_payload((const char *)payload, payload_length, &cfg,
+                                          plugin_now(), &rewritten, &rewritten_length, &used);
+  if (status != REWRITE_APPLIED) {
+    events_add(status == REWRITE_NONE ? "unchanged" : "failed",
+               origin, cfg.target_zone, status == REWRITE_NONE ? used.date : "");
+    free(payload);
+    return;
+  }
+
+  char *encoded = base64_encode((unsigned char *)rewritten, rewritten_length);
+  free(rewritten);
+  free(payload);
+  if (!encoded) {
+    events_add("failed", origin, cfg.target_zone, "");
+    return;
+  }
+  size_t capacity = strlen(encoded) + 64;
+  char *result = (char *)malloc(capacity);
+  if (result) {
+    snprintf(result, capacity, "{\"ok\":true,\"result\":{\"Body\":\"%s\"}}", encoded);
+    reply(response, result);
+    free(result);
+  }
+  if (response->ptr) events_add("rewritten", origin, cfg.target_zone, used.date);
+  else events_add("failed", origin, cfg.target_zone, used.date);
+  free(encoded);
+}
+
+// ---------------------------------------------------------------------------
+// Management API
+// ---------------------------------------------------------------------------
+
+static void handle_status(plugin_buffer *out) {
+  tz_settings cfg;
+  settings_load(&cfg);
+  long long now = plugin_now();
+  rewrite_context local, target;
+  int local_ok = rewrite_context_build(cfg.local_zone, now, &local);
+  int target_ok = rewrite_context_build(cfg.target_zone, now, &target);
+  char body[768];
+  snprintf(body, sizeof(body),
+           "{\"ok\":true,\"version\":\"%s\",\"settings\":{\"enabled\":%s,\"logging\":%s,"
+           "\"local_zone\":\"%s\",\"target_zone\":\"%s\"},"
+           "\"local\":{\"zone\":\"%s\",\"date\":\"%s\",\"time\":\"%s\",\"abbreviation\":\"%s\",\"offset\":\"%s\"},"
+           "\"target\":{\"zone\":\"%s\",\"date\":\"%s\",\"time\":\"%s\",\"abbreviation\":\"%s\",\"offset\":\"%s\"},"
+           "\"timezones\":%d}",
+           VERSION,
+           cfg.enabled ? "true" : "false", cfg.logging ? "true" : "false",
+           cfg.local_zone, cfg.target_zone,
+           local_ok ? local.zone : "", local_ok ? local.date : "", local_ok ? local.time : "",
+           local_ok ? local.abbr : "", local_ok ? local.offset : "",
+           target_ok ? target.zone : "", target_ok ? target.date : "", target_ok ? target.time : "",
+           target_ok ? target.abbr : "", target_ok ? target.offset : "",
+           tz_count());
+  json_response(out, 200, body);
+}
+
+// One row per zone, ordered as in the generated table (alphabetical).
+static void handle_timezones(plugin_buffer *out) {
+  size_t capacity = (size_t)tz_count() * 96 + 64;
+  char *body = (char *)malloc(capacity);
+  if (!body) return;
+  size_t used = (size_t)snprintf(body, capacity, "{\"ok\":true,\"zones\":[");
+  for (int i = 0; i < tz_count(); i++) {
+    const tz_entry *entry = tz_at(i);
+    char *quoted = json_encode(entry->name);
+    if (!quoted) break;
+    int written = snprintf(body + used, capacity - used, "%s%s", i ? "," : "", quoted);
+    free(quoted);
+    if (written < 0 || (size_t)written >= capacity - used) break;
+    used += (size_t)written;
+  }
+  snprintf(body + used, capacity - used, "]}");
+  json_response(out, 200, body);
+  free(body);
+}
+
+static void handle_events(plugin_buffer *out) {
+  char list[EVENT_ROWS * 260];
+  events_json(list, sizeof(list));
+  size_t capacity = strlen(list) + 64;
+  char *body = (char *)malloc(capacity);
+  if (!body) return;
+  snprintf(body, capacity, "{\"ok\":true,\"events\":[%s]}", list);
+  json_response(out, 200, body);
+  free(body);
+}
+
+// Dry-run self test: rewrite a synthetic request and report what changed.
+static void handle_selftest(plugin_buffer *out) {
+  tz_settings cfg;
+  settings_load(&cfg);
+  if (!cfg.enabled) {
+    json_response(out, 409, "{\"ok\":false,\"reason\":\"时区同步已关闭\"}");
+    return;
+  }
+  static const char sample[] =
+      "{\"model\":\"codex-selftest\",\"input\":[{\"type\":\"message\",\"role\":\"user\","
+      "\"content\":[{\"type\":\"input_text\",\"text\":\"<environment_context><timezone>"
+      "Asia/Shanghai</timezone><current_date>2000-01-01</current_date></environment_context>\"}]}]}";
+  char *rewritten = NULL;
+  size_t rewritten_length = 0;
+  rewrite_context used;
+  rewrite_status status = rewrite_payload(sample, sizeof(sample) - 1, &cfg, plugin_now(),
+                                          &rewritten, &rewritten_length, &used);
+  if (status != REWRITE_APPLIED || !rewritten) {
+    json_response(out, 500, "{\"ok\":false,\"reason\":\"请求重写自检失败\"}");
+    free(rewritten);
+    return;
+  }
+  char *body = (char *)malloc(rewritten_length + 256);
+  if (!body) {
+    free(rewritten);
+    return;
+  }
+  snprintf(body, rewritten_length + 256,
+           "{\"ok\":true,\"target_zone\":\"%s\",\"date\":\"%s\",\"sample\":%.*s}",
+           used.zone, used.date, (int)(rewritten_length > 512 ? 512 : rewritten_length), rewritten);
+  json_response(out, 200, body);
+  free(body);
+  free(rewritten);
+}
+
+static int json_bool(const char *raw, json_token token, int *out) {
+  if (token.type != JSON_PRIMITIVE) return 0;
+  size_t length = (size_t)(token.end - token.start);
+  if (length == 4 && memcmp(raw + token.start, "true", 4) == 0) { *out = 1; return 1; }
+  if (length == 5 && memcmp(raw + token.start, "false", 5) == 0) { *out = 0; return 1; }
+  return 0;
+}
+
+static void handle_settings_save(const char *raw, const json_token *tokens, int body,
+                                 plugin_buffer *out) {
+  if (body < 0 || tokens[body].type != JSON_STRING) {
+    json_response(out, 400, "{\"ok\":false,\"reason\":\"缺少 JSON 请求体\"}");
+    return;
+  }
+  size_t length = 0;
+  unsigned char *decoded = base64_decode(raw + tokens[body].start,
+                                         (size_t)(tokens[body].end - tokens[body].start),
+                                         &length);
+  if (!decoded || length > 2048) {
+    free(decoded);
+    json_response(out, 400, "{\"ok\":false,\"reason\":\"请求体无效\"}");
+    return;
+  }
+  tz_settings cfg;
+  settings_load(&cfg);
+  json_token fields[32];
+  int field_count = json_parse((char *)decoded, length, fields, 32);
+  if (field_count < 1 || fields[0].type != JSON_OBJECT) {
+    free(decoded);
+    json_response(out, 400, "{\"ok\":false,\"reason\":\"请求体无效\"}");
+    return;
+  }
+  int ok = 1;
+  int index = json_field((char *)decoded, fields, field_count, 0, "enabled");
+  if (index >= 0 && !json_bool((char *)decoded, fields[index], &cfg.enabled)) ok = 0;
+  index = json_field((char *)decoded, fields, field_count, 0, "logging");
+  if (index >= 0 && !json_bool((char *)decoded, fields[index], &cfg.logging)) ok = 0;
+  const char *names[] = {"local_zone", "target_zone"};
+  char *targets[] = {cfg.local_zone, cfg.target_zone};
+  const size_t caps[] = {sizeof(cfg.local_zone), sizeof(cfg.target_zone)};
+  for (int i = 0; ok && i < 2; i++) {
+    index = json_field((char *)decoded, fields, field_count, 0, names[i]);
+    if (index < 0) continue;
+    if (fields[index].type != JSON_STRING) { ok = 0; break; }
+    char *value = json_decode((char *)decoded, fields[index]);
+    if (!value || !settings_zone_valid(value) || strlen(value) >= caps[i]) ok = 0;
+    else snprintf(targets[i], caps[i], "%s", value);
+    free(value);
+  }
+  free(decoded);
+  if (!ok) {
+    json_response(out, 400, "{\"ok\":false,\"reason\":\"时区或开关取值无效\"}");
+    return;
+  }
+  if (!settings_save(&cfg)) {
+    json_response(out, 500, "{\"ok\":false,\"reason\":\"配置写入失败\"}");
+    return;
+  }
+  handle_status(out);
+}
+
+// Routes are matched against the path suffix after ROUTE_PREFIX.
+static int route_is(const char *raw, json_token token, const char *suffix) {
+  char expected[128];
+  snprintf(expected, sizeof(expected), "%s%s", ROUTE_PREFIX, suffix);
+  return json_string_is(raw, token, expected);
+}
+
+static void handle_management(const unsigned char *request, size_t length, plugin_buffer *response) {
+  if (!request || !length || length > BODY_MAX) {
+    reply(response, "{\"ok\":false,\"error\":{\"code\":\"invalid_request\"}}");
+    return;
+  }
+  const char *raw = (const char *)request;
+  json_token *tokens = (json_token *)malloc(TOKENS_MAX * sizeof(json_token));
+  if (!tokens) return;
+  int count = json_parse(raw, length, tokens, TOKENS_MAX);
+  if (count < 1 || tokens[0].type != JSON_OBJECT) {
+    free(tokens);
+    return;
+  }
+  int object = 0;
+  int wrapped = json_field(raw, tokens, count, object, "request");
+  if (wrapped >= 0 && tokens[wrapped].type == JSON_OBJECT) object = wrapped;
+  const char *const kPath[] = {"Path", "path", NULL};
+  const char *const kMethod[] = {"Method", "method", NULL};
+  int path = json_field_any(raw, tokens, count, object, kPath);
+  int method = json_field_any(raw, tokens, count, object, kMethod);
+  int body = json_field_any(raw, tokens, count, object, kBody);
+  if (path < 0 || method < 0) {
+    free(tokens);
+    reply(response, "{\"ok\":false,\"error\":{\"code\":\"invalid_request\"}}");
+    return;
+  }
+
+  int is_get = json_string_is(raw, tokens[method], "GET");
+  int is_post = json_string_is(raw, tokens[method], "POST");
+  int is_put = json_string_is(raw, tokens[method], "PUT");
+
+  if (is_get && json_string_is(raw, tokens[path], PANEL_ROUTE)) {
+    free(tokens);
+    html_response(response, dashboard_html, dashboard_html_size);
+    return;
+  }
+  if (is_get && route_is(raw, tokens[path], "status")) {
+    free(tokens);
+    handle_status(response);
+    return;
+  }
+  if (is_get && route_is(raw, tokens[path], "timezones")) {
+    free(tokens);
+    handle_timezones(response);
+    return;
+  }
+  if (is_get && route_is(raw, tokens[path], "events")) {
+    free(tokens);
+    handle_events(response);
+    return;
+  }
+  if (is_post && route_is(raw, tokens[path], "events/clear")) {
+    events_clear();
+    free(tokens);
+    json_response(response, 200, "{\"ok\":true}");
+    return;
+  }
+  if (is_post && route_is(raw, tokens[path], "selftest")) {
+    free(tokens);
+    handle_selftest(response);
+    return;
+  }
+  if (is_put && route_is(raw, tokens[path], "settings")) {
+    handle_settings_save(raw, tokens, body, response);
+    free(tokens);
+    return;
+  }
+  free(tokens);
+  reply(response, "{\"ok\":true,\"result\":{\"StatusCode\":404,\"Headers\":{"
+                  "\"Content-Type\":[\"text/plain; charset=utf-8\"]},\"Body\":\"Tm90IGZvdW5k\"}}");
+}
+
+// ---------------------------------------------------------------------------
+// ABI entry points
+// ---------------------------------------------------------------------------
+
+static const char *const kRegister =
+    "{\"ok\":true,\"result\":{\"schema_version\":1,\"metadata\":{"
+    "\"Name\":\"Codex Timezone Sync\",\"Version\":\"" VERSION "\","
+    "\"Author\":\"azmiao\",\"GitHubRepository\":\"https://github.com/azmiao/codex-timezone-sync\","
+    "\"ConfigFields\":[]},"
+    "\"capabilities\":{\"request_interceptor\":true,\"management_api\":true}}}";
+
+static const char *const kManagement =
+    "{\"ok\":true,\"result\":{\"Routes\":["
+    "{\"Method\":\"GET\",\"Path\":\"/plugins/codex-timezone-sync/status\"},"
+    "{\"Method\":\"PUT\",\"Path\":\"/plugins/codex-timezone-sync/settings\"},"
+    "{\"Method\":\"GET\",\"Path\":\"/plugins/codex-timezone-sync/timezones\"},"
+    "{\"Method\":\"GET\",\"Path\":\"/plugins/codex-timezone-sync/events\"},"
+    "{\"Method\":\"POST\",\"Path\":\"/plugins/codex-timezone-sync/events/clear\"},"
+    "{\"Method\":\"POST\",\"Path\":\"/plugins/codex-timezone-sync/selftest\"}],"
+    "\"Resources\":[{\"Path\":\"/panel\",\"Menu\":\"Codex Timezone Sync\","
+    "\"Description\":\"选择本地与目标时区，校正 Codex 请求中的日期与时区\"}]}}";
+
+static int plugin_call(const char *method, const unsigned char *request, size_t length,
+                       plugin_buffer *response) {
+  if (response) {
+    response->ptr = NULL;
+    response->len = 0;
+  }
+  if (!method || !response) return 1;
+  if (!strcmp(method, "plugin.register") || !strcmp(method, "plugin.reconfigure")) {
+    reply(response, kRegister);
+    return 0;
+  }
+  if (!strcmp(method, "management.register")) {
+    reply(response, kManagement);
+    return 0;
+  }
+  if (!strcmp(method, "management.handle")) {
+    handle_management(request, length, response);
+    return 0;
+  }
+  if (!strcmp(method, "request.intercept_after")) {
+    handle_request(request, length, response);
+    if (!response->ptr) reply(response, "{\"ok\":true,\"result\":{}}");
+    return 0;
+  }
+  if (!strcmp(method, "request.intercept_before")) {
+    reply(response, "{\"ok\":true,\"result\":{}}");
+    return 0;
+  }
+  reply(response, "{\"ok\":false,\"error\":{\"code\":\"unknown_method\","
+                  "\"message\":\"unsupported method\"}}");
+  return 0;
+}
+
+static void plugin_free(void *pointer, size_t length) {
+  (void)length;
+  free(pointer);
+}
+
+static void plugin_shutdown(void) {
+  events_clear();
+}
+
 #ifdef _WIN32
 __declspec(dllexport)
 #else
 __attribute__((visibility("default")))
 #endif
-int cliproxy_plugin_init(const cliproxy_host_api *host,cliproxy_plugin_api *plugin){
+int cliproxy_plugin_init(void *host, void *plugin) {
   (void)host;
-  if(!plugin)return 1;
-  plugin->abi_version=ABI_VERSION;
-  plugin->call=plugin_call;plugin->free_buffer=plugin_free;plugin->shutdown=plugin_shutdown;
+  if (!plugin) return 1;
+  cliproxy_plugin_api *api = (cliproxy_plugin_api *)plugin;
+  api->abi_version = ABI_VERSION;
+  api->call = plugin_call;
+  api->free_buffer = plugin_free;
+  api->shutdown = plugin_shutdown;
+  events_init();
   return 0;
 }
