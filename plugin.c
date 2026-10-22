@@ -146,6 +146,14 @@ static void html_response(plugin_buffer *out, const unsigned char *html, size_t 
 static const char *const kToFormat[] = {"ToFormat", "to_format", NULL};
 static const char *const kBody[] = {"Body", "body", NULL};
 
+// The activity ring is opt-out: it holds no request content, but a user who
+// turned logging off should still see an empty list.
+static void note_event(const tz_settings *cfg, const char *result, const char *from,
+                       const char *to, const char *date) {
+  if (!cfg->logging) return;
+  events_add(result, from, to, date);
+}
+
 static void handle_request(const unsigned char *request, size_t length, plugin_buffer *response) {
   if (!request || !length || length > BODY_MAX) return;
   const char *raw = (const char *)request;
@@ -181,11 +189,11 @@ static void handle_request(const unsigned char *request, size_t length, plugin_b
                                          &payload_length);
   free(tokens);
   if (!payload) {
-    events_add("failed", "", cfg.target_zone, "");
+    note_event(&cfg, "failed", "", cfg.target_zone, "");
     return;
   }
 
-  char origin[64];
+  char origin[TZ_NAME_MAX];
   rewrite_origin_zone((const char *)payload, payload_length, origin, sizeof(origin));
 
   char *rewritten = NULL;
@@ -195,7 +203,7 @@ static void handle_request(const unsigned char *request, size_t length, plugin_b
   rewrite_status status = rewrite_payload((const char *)payload, payload_length, &cfg,
                                           plugin_now(), &rewritten, &rewritten_length, &used);
   if (status != REWRITE_APPLIED) {
-    events_add(status == REWRITE_NONE ? "unchanged" : "failed",
+    note_event(&cfg, status == REWRITE_NONE ? "unchanged" : "failed",
                origin, cfg.target_zone, status == REWRITE_NONE ? used.date : "");
     free(payload);
     return;
@@ -205,7 +213,7 @@ static void handle_request(const unsigned char *request, size_t length, plugin_b
   free(rewritten);
   free(payload);
   if (!encoded) {
-    events_add("failed", origin, cfg.target_zone, "");
+    note_event(&cfg, "failed", origin, cfg.target_zone, used.date);
     return;
   }
   size_t capacity = strlen(encoded) + 64;
@@ -215,8 +223,7 @@ static void handle_request(const unsigned char *request, size_t length, plugin_b
     reply(response, result);
     free(result);
   }
-  if (response->ptr) events_add("rewritten", origin, cfg.target_zone, used.date);
-  else events_add("failed", origin, cfg.target_zone, used.date);
+  note_event(&cfg, response->ptr ? "rewritten" : "failed", origin, cfg.target_zone, used.date);
   free(encoded);
 }
 
@@ -270,7 +277,7 @@ static void handle_timezones(plugin_buffer *out) {
 }
 
 static void handle_events(plugin_buffer *out) {
-  char list[EVENT_ROWS * 260];
+  char list[EVENT_JSON_BYTES];
   events_json(list, sizeof(list));
   size_t capacity = strlen(list) + 64;
   char *body = (char *)malloc(capacity);
@@ -302,17 +309,20 @@ static void handle_selftest(plugin_buffer *out) {
     free(rewritten);
     return;
   }
-  char *body = (char *)malloc(rewritten_length + 256);
-  if (!body) {
-    free(rewritten);
-    return;
-  }
-  snprintf(body, rewritten_length + 256,
-           "{\"ok\":true,\"target_zone\":\"%s\",\"date\":\"%s\",\"sample\":%.*s}",
-           used.zone, used.date, (int)(rewritten_length > 512 ? 512 : rewritten_length), rewritten);
-  json_response(out, 200, body);
-  free(body);
+  // The sample is returned as a JSON string, so the response stays valid JSON
+  // no matter what the rewritten request contains.
+  char *encoded = json_encode(rewritten);
   free(rewritten);
+  if (!encoded) return;
+  size_t capacity = strlen(encoded) + 256;
+  char *body = (char *)malloc(capacity);
+  if (body) {
+    snprintf(body, capacity, "{\"ok\":true,\"target_zone\":\"%s\",\"date\":\"%s\",\"sample\":%s}",
+             used.zone, used.date, encoded);
+    json_response(out, 200, body);
+    free(body);
+  }
+  free(encoded);
 }
 
 static int json_bool(const char *raw, json_token token, int *out) {

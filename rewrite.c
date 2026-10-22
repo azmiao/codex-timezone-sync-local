@@ -181,49 +181,75 @@ static void collect_messages(const char *text, const json_token *tokens, int cou
   }
 }
 
+// Build "<prefix><encoded context><suffix>" without a fixed-size stack buffer:
+// the encoded context can be several times longer than the raw text.
+static char *wrap_encoded(const char *prefix, const char *encoded, const char *suffix) {
+  size_t prefix_length = strlen(prefix);
+  size_t encoded_length = strlen(encoded);
+  size_t suffix_length = strlen(suffix);
+  char *out = (char *)malloc(prefix_length + encoded_length + suffix_length + 1);
+  if (!out) return NULL;
+  memcpy(out, prefix, prefix_length);
+  memcpy(out + prefix_length, encoded, encoded_length);
+  memcpy(out + prefix_length + encoded_length, suffix, suffix_length);
+  out[prefix_length + encoded_length + suffix_length] = 0;
+  return out;
+}
+
 // Insert the context where the Codex request expects instructions.
 static char *insert_context(const char *payload, size_t length, const json_token *tokens,
                             int count, int instructions, int input, int messages,
                             const char *context, size_t *out_length) {
-  char quoted[CONTEXT_MAX * 2 + 8];
+  (void)count;
   char *encoded = json_encode(context);
   if (!encoded) return NULL;
-  snprintf(quoted, sizeof(quoted), "%s", encoded);
-  free(encoded);
+  char *out = NULL;
   if (instructions >= 0 && tokens[instructions].type == JSON_STRING) {
-    char *suffix = (char *)malloc(strlen(quoted) + 8);
-    if (!suffix) return NULL;
-    snprintf(suffix, strlen(quoted) + 8, "\\n\\n%.*s", (int)(strlen(quoted) - 2), quoted + 1);
-    char *out = json_splice(payload, length, (size_t)tokens[instructions].end, 0,
-                            suffix, strlen(suffix), out_length);
-    free(suffix);
-    return out;
-  }
-  if (instructions >= 0 && tokens[instructions].type == JSON_PRIMITIVE &&
-      (size_t)(tokens[instructions].end - tokens[instructions].start) == 4 &&
-      memcmp(payload + tokens[instructions].start, "null", 4) == 0) {
-    return json_splice(payload, length, (size_t)tokens[instructions].start, 4,
-                       quoted, strlen(quoted), out_length);
-  }
-  if (instructions >= 0) return NULL; // Unexpected type: do not duplicate.
-  if (input >= 0 && tokens[input].type == JSON_ARRAY) {
-    char field[CONTEXT_MAX * 2 + 32];
-    snprintf(field, sizeof(field), "\"instructions\":%s,", quoted);
-    return json_splice(payload, length, (size_t)tokens[0].start + 1, 0,
-                       field, strlen(field), out_length);
-  }
-  if (messages >= 0 && tokens[messages].type == JSON_ARRAY) {
-    // The array may be empty, in which case no leading comma is needed.
+    // Append inside the existing string literal: the encoded quotes must be
+    // dropped, otherwise they would terminate the string early.
+    size_t inner = strlen(encoded) - 2;
+    char *text = (char *)malloc(inner + 1);
+    if (text) {
+      memcpy(text, encoded + 1, inner);
+      text[inner] = 0;
+      char *suffix = wrap_encoded("\\n\\n", text, "");
+      free(text);
+      if (suffix) {
+        out = json_splice(payload, length, (size_t)tokens[instructions].end, 0,
+                          suffix, strlen(suffix), out_length);
+        free(suffix);
+      }
+    }
+  } else if (instructions >= 0 && tokens[instructions].type == JSON_PRIMITIVE &&
+             (size_t)(tokens[instructions].end - tokens[instructions].start) == 4 &&
+             memcmp(payload + tokens[instructions].start, "null", 4) == 0) {
+    out = json_splice(payload, length, (size_t)tokens[instructions].start, 4,
+                      encoded, strlen(encoded), out_length);
+  } else if (instructions >= 0) {
+    // Unexpected type: refuse rather than risk a duplicate instruction block.
+    out = NULL;
+  } else if (input >= 0 && tokens[input].type == JSON_ARRAY) {
+    char *field = wrap_encoded("\"instructions\":", encoded, ",");
+    if (field) {
+      out = json_splice(payload, length, (size_t)tokens[0].start + 1, 0,
+                        field, strlen(field), out_length);
+      free(field);
+    }
+  } else if (messages >= 0 && tokens[messages].type == JSON_ARRAY) {
+    // The array may be empty, in which case no trailing comma is needed.
     size_t at = (size_t)tokens[messages].start + 1;
     size_t check = at;
     while (check < length && isspace((unsigned char)payload[check])) check++;
     int needs_comma = check < length && payload[check] != ']';
-    char message[CONTEXT_MAX * 2 + 96];
-    snprintf(message, sizeof(message), "{\"role\":\"developer\",\"content\":%.*s}%s",
-             (int)(strlen(quoted) - 2), quoted + 1, needs_comma ? "," : "");
-    return json_splice(payload, length, at, 0, message, strlen(message), out_length);
+    char *message = wrap_encoded("{\"role\":\"developer\",\"content\":", encoded,
+                                 needs_comma ? "}," : "}");
+    if (message) {
+      out = json_splice(payload, length, at, 0, message, strlen(message), out_length);
+      free(message);
+    }
   }
-  return NULL;
+  free(encoded);
+  return out;
 }
 
 static int safe_zone(const char *value) {

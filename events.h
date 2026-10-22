@@ -7,6 +7,10 @@
 #include <stddef.h>
 
 #define EVENT_ROWS 20
+// Worst case per serialized row: timestamp, three quoted 64-byte zones, a date
+// and the object scaffolding.
+#define EVENT_ROW_BYTES 320
+#define EVENT_JSON_BYTES (EVENT_ROWS * EVENT_ROW_BYTES + 16)
 
 typedef struct {
   long long timestamp;
