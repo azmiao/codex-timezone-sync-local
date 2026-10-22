@@ -20,3 +20,4 @@ dist/
 *.tar.gz
 preview.png
 deploy.sh
+.openbitfun/
