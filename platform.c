@@ -71,8 +71,7 @@ int plugin_write_file_atomic(const char *path, const char *data, size_t length) 
 
 #else
 
-#include <errno.h>
-#include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 const char *plugin_getenv(const char *name) {
@@ -90,7 +89,9 @@ int plugin_write_file_atomic(const char *path, const char *data, size_t length) 
   snprintf(temp, capacity, "%s.XXXXXX", path);
   int fd = mkstemp(temp);
   if (fd < 0) { free(temp); return 0; }
-  int ok = fchmod(fd, 0600) == 0;
+  // mkstemp creates the file 0600 already; chmod by path keeps the intent
+  // explicit without depending on fchmod's feature-test visibility.
+  int ok = chmod(temp, 0600) == 0;
   size_t written = 0;
   while (ok && written < length) {
     ssize_t chunk = write(fd, data + written, length - written);

@@ -338,10 +338,15 @@ def write(rules, lists):
         lines.append('};')
         lines.append('')
     lines.append('static const tz_entry tz_table[] = {')
-    for zone, rule in rules:
-        lines.append(f'  {{"{zone}", "{rule}", NULL, 0}},')
-    for zone, rows in lists:
-        lines.append(f'  {{"{zone}", NULL, {symbol(zone)}, {len(rows)}}},')
+    # Interleave both kinds so the table stays alphabetically sorted; the panel
+    # renders it as-is and tests assert on the order.
+    by_name = dict(lists)
+    for zone, rule in sorted(rules + [(name, None) for name in by_name]):
+        if rule is not None:
+            lines.append(f'  {{"{zone}", "{rule}", NULL, 0}},')
+        else:
+            rows = by_name[zone]
+            lines.append(f'  {{"{zone}", NULL, {symbol(zone)}, {len(rows)}}},')
     lines.append('};')
     lines.append('')
     OUTPUT.write_text('\n'.join(lines), encoding='ascii', newline='\n')
