@@ -6,234 +6,321 @@
 <meta name="color-scheme" content="dark">
 <title>Codex Timezone Sync</title>
 <style>
-:root{color-scheme:dark;--bg:#121110;--card:#1b1a18;--card2:#22211f;--line:#605035;--sub:#b3b0aa;--text:#f1f0ee;--gold:#edb858;--gold2:#c18c3e;--green:#43d98b;--red:#f58b79}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 55% 5%,#201e1b 0%,var(--bg) 60%);font:15px/1.5 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--text);min-height:100vh}
-button,input{font:inherit}button{cursor:pointer}button:disabled,input:disabled{opacity:.48;cursor:not-allowed}button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
-.app{max-width:1520px;margin:auto;padding:25px 36px 36px}.top{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:20px}.identity{display:flex;align-items:center;gap:24px}.symbol{width:84px;height:68px;flex:none;color:var(--gold)}h1{font-size:34px;letter-spacing:-.5px;line-height:1.12;margin:0 0 5px;font-weight:700}h2{font-size:19px;margin:0 0 13px;font-weight:700}.subtitle{font-size:18px;letter-spacing:.3px;color:var(--sub)}
-.toptools{display:flex;gap:8px;align-items:center}.square{width:47px;height:45px;border:1px solid #49443c;background:#1b1a18;border-radius:9px;color:#ddd;display:grid;place-items:center}.square:hover{color:var(--gold);border-color:var(--gold)}
-svg{width:22px;height:22px;vertical-align:middle;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.symbol svg{width:100%;height:100%;stroke-width:1.5}
-.auth{display:flex;gap:12px;align-items:center;border:1px solid #3b352c;border-radius:12px;padding:12px 16px;margin-bottom:14px;background:#211f1b}.auth label{font-weight:600;white-space:nowrap}.auth input{background:#141310;color:#fff;border:1px solid #4c463c;padding:10px 13px;border-radius:8px;flex:1;min-width:100px;max-width:360px}.auth .helper{color:var(--sub);font-size:13px;flex:1}.auth .connected{color:var(--green)}
-.tabs{display:flex;margin-bottom:14px}.tab{height:47px;min-width:112px;padding:0 20px;color:#d5d2ce;background:#201e1b;border:1px solid #35302a;margin-left:-1px}.tab:first-child{border-radius:10px 0 0 10px;margin-left:0}.tab:last-child{border-radius:0 10px 10px 0}.tab[aria-selected=true]{background:#2a2316;border:1px solid var(--gold);color:#f1c578;font-weight:700;border-radius:10px;position:relative;z-index:1}
-.panel{border:1px solid var(--line);background:linear-gradient(105deg,#1a1917,#201e1b);border-radius:13px;padding:22px 23px;min-width:0}.status{display:grid;grid-template-columns:1fr 1.35fr 1.36fr 1.17fr auto;align-items:center;gap:0;min-height:120px;margin-bottom:17px}.stat{padding:0 24px;border-right:1px solid #41403c;min-width:0}.stat:first-child{padding-left:12px}.stat:nth-child(4){border-right:0}.stat label{display:block;color:#c3c0bc;font-size:16px;margin-bottom:5px}.stat strong{font-size:17px;font-weight:550;overflow-wrap:anywhere}.big-status{color:var(--green)!important}.status-btn{padding-left:12px}
-.gold{background:linear-gradient(110deg,#f6c864,#c99142);color:#201408;border:1px solid #eec06c;font-weight:700;border-radius:10px;padding:14px 23px;display:inline-flex;gap:15px;align-items:center;justify-content:center;min-height:62px;white-space:nowrap}.gold:hover{filter:brightness(1.08)}.outline{background:transparent;border:1px solid #817c74;color:#eee;border-radius:10px;min-height:58px;display:inline-flex;align-items:center;justify-content:center;gap:14px;font-weight:600;padding:12px 20px}.outline:hover{border-color:var(--gold)}
-.content-grid{display:grid;grid-template-columns:minmax(0,2.6fr) minmax(290px,1fr);gap:18px;margin-bottom:17px}.section-icon{color:var(--gold);margin-right:11px;font-size:21px}.feature-head,.feature{display:grid;grid-template-columns:26% 45% 17% 12%;align-items:center;gap:0}.feature-head{background:#292724;border:1px solid #34312d;color:#d8d5d1;border-radius:9px 9px 0 0;padding:12px 18px}.feature{min-height:54px;border-bottom:1px solid #3b3935;padding:7px 18px}.feature span:nth-child(2){color:#c6c3bf;font-size:14px;padding-right:12px}.feature strong{font-weight:500}.dot{height:10px;width:10px;background:var(--green);display:inline-block;border-radius:50%;margin-right:9px}.dot.off{background:#929292}.danger{color:var(--red)}.positive{color:var(--green)}.muted{color:var(--sub)}
-.switch{display:inline-flex;align-items:center;cursor:pointer;position:relative;width:51px;height:29px}.switch input{opacity:0;position:absolute;width:100%;height:100%;margin:0;cursor:pointer;z-index:1}.switch span{width:51px;height:29px;border-radius:18px;background:#545454;border:1px solid #7c7c7c;transition:background .15s}.switch span:after{content:"";display:block;background:#fbfbfb;width:21px;height:21px;margin:3px;border-radius:50%;box-shadow:0 1px 4px #0006;transition:transform .15s}.switch input:checked+span{background:linear-gradient(100deg,#f3be59,#cc963e);border-color:#f3c265}.switch input:checked+span:after{transform:translateX(21px)}
-.operations .divider{border-top:1px solid #49443b;margin:15px 0 20px}.operations button{width:100%;margin:0 0 14px}.operations button:last-of-type{margin-bottom:0}.hint{font-size:12px;color:var(--sub);margin:12px 0 0}.log-panel{margin-top:16px}.table-wrap{overflow-x:auto}.table{width:100%;border-collapse:collapse;text-align:left;white-space:nowrap}.table th{font-weight:500;color:#d5d1cc;background:#282623;padding:12px 15px}.table th:first-child{border-radius:8px 0 0 8px}.table th:last-child{border-radius:0 8px 8px 0}.table td{padding:10px 15px;border-bottom:1px solid #3a3733;color:#d7d3cf}.table td:last-child{color:var(--green)}.table .empty{text-align:center;color:var(--sub);padding:34px}.secondary{color:var(--sub)!important}
-#settings-view{display:none}#settings-view.active{display:block}#overview-view.hidden{display:none}.bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}.bar p{margin:0;color:var(--sub)}.bar button{min-height:42px}.bar-actions{display:flex;gap:8px;flex-wrap:wrap}.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.setting-card{border:1px solid #3f3930;padding:18px;border-radius:11px;background:#24211d}.setting-card strong{display:block;margin-bottom:7px}.setting-card p{margin:0;color:var(--sub)}
-.feedback{margin-top:12px;min-height:24px;color:var(--gold);font-size:14px}.feedback.error{color:var(--red)}.footer{color:#827b70;font-size:12px;margin-top:18px;text-align:right}
-.metrics{display:flex;align-items:center;gap:28px;flex-wrap:wrap;margin-bottom:17px}.metrics strong{font-size:22px}.metrics .bar-actions{margin-left:auto}.metrics button{min-height:38px}
-.request-preview{white-space:pre-wrap;overflow:auto;max-height:420px;max-width:100%;font-size:12px;word-break:break-word;background:#11100f;border:1px solid #393632;padding:14px;border-radius:8px}
-@media(max-width:1150px){.status{grid-template-columns:1fr 1.3fr 1.3fr 1fr}.status-btn{grid-column:1/-1;padding:18px 10px 0}.status-btn button{width:100%;min-height:50px}.stat{padding:0 13px}.content-grid{grid-template-columns:1fr}.feature-head,.feature{grid-template-columns:27% 44% 17% 12%}}
-@media(max-width:700px){.app{padding:18px 13px}.identity{gap:10px}.symbol{width:48px;height:48px}h1{font-size:22px}.subtitle{font-size:13px}.toptools .square{width:39px;height:39px}.auth{flex-wrap:wrap}.auth .helper{min-width:100%}.tabs .tab{min-width:0;flex:1}.panel{padding:15px}.status{grid-template-columns:1fr 1fr;gap:16px}.stat{padding:0 6px;border:0}.stat label{font-size:13px}.stat strong{font-size:14px}.status-btn{padding:0}.feature-head,.feature{grid-template-columns:35% 43% 22%}.feature-head span:nth-child(4),.feature span:nth-child(4){grid-column:3;grid-row:auto}.feature-head span:nth-child(3),.feature span:nth-child(3){display:none}.feature span:nth-child(2){font-size:12px}.feature{padding:8px;min-height:65px}.feature-head{padding:8px}.settings-grid{grid-template-columns:1fr}}
+:root{color-scheme:dark;--bg:#121110;--card:#1b1a18;--line:#4a4235;--sub:#a9a49c;--text:#f1f0ee;--gold:#edb858;--green:#43d98b;--red:#f58b79}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 50% 0%,#211f1b 0%,var(--bg) 62%);font:15px/1.55 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--text);min-height:100vh}
+button,select,input{font:inherit}
+button{cursor:pointer}
+button:disabled,select:disabled,input:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.app{max-width:1080px;margin:0 auto;padding:28px 24px 40px}
+header{display:flex;align-items:center;gap:16px;margin-bottom:22px}
+.symbol{width:56px;height:56px;flex:none;color:var(--gold)}
+svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+h1{font-size:24px;margin:0;font-weight:700}
+.subtitle{color:var(--sub);font-size:14px}
+.auth{display:flex;flex-wrap:wrap;gap:10px;align-items:center;border:1px solid #3a352c;border-radius:12px;padding:12px 14px;margin-bottom:16px;background:#1e1c19}
+.auth label{font-weight:600;white-space:nowrap}
+.auth input{flex:1;min-width:140px;max-width:340px;background:#141310;color:#fff;border:1px solid #4a443a;border-radius:8px;padding:9px 12px}
+.auth .helper{color:var(--sub);font-size:13px;flex:1;min-width:100%}
+.auth .connected{color:var(--green)}
+.panel{border:1px solid var(--line);background:linear-gradient(150deg,#1a1917,#201e1b);border-radius:13px;padding:20px 22px;margin-bottom:16px}
+.panel h2{font-size:16px;margin:0 0 14px;font-weight:700;color:#e6e2dc}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.card{border:1px solid #3d372e;border-radius:11px;padding:16px;background:#232019}
+.card strong{display:block;font-size:13px;color:var(--sub);margin-bottom:8px;font-weight:600;letter-spacing:.4px}
+select{width:100%;background:#141310;color:#fff;border:1px solid #4a443a;border-radius:8px;padding:10px 12px}
+select:disabled{background:#1b1a18}
+.readout{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin-top:12px;font-size:13px}
+.readout span{color:var(--sub)}
+.readout b{font-weight:600;font-variant-numeric:tabular-nums}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.toggle{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.toggle input{position:absolute;opacity:0;width:0;height:0}
+.track{width:46px;height:26px;border-radius:14px;background:#4a4a4a;border:1px solid #6d6d6d;position:relative;transition:background .15s;flex:none}
+.track::after{content:"";position:absolute;width:20px;height:20px;margin:2px;border-radius:50%;background:#fbfbfb;transition:transform .15s;box-shadow:0 1px 3px #0006}
+.toggle input:checked+.track{background:linear-gradient(100deg,#f3be59,#cc963e);border-color:#f3c265}
+.toggle input:checked+.track::after{transform:translateX(20px)}
+.toggle input:disabled+.track{opacity:.5}
+button.action{background:linear-gradient(110deg,#f6c864,#c99142);color:#201408;border:1px solid #eec06c;border-radius:9px;padding:10px 18px;font-weight:700}
+button.action:hover{filter:brightness(1.07)}
+button.ghost{background:transparent;border:1px solid #6b655c;color:#eee;border-radius:9px;padding:9px 16px;font-weight:600}
+button.ghost:hover{border-color:var(--gold);color:var(--gold)}
+.feedback{margin-top:12px;min-height:22px;font-size:13px;color:var(--gold)}
+.feedback.error{color:var(--red)}
+.table{width:100%;border-collapse:collapse;font-size:13px}
+.table th{text-align:left;font-weight:600;color:#cdc8c1;background:#282521;padding:9px 12px;white-space:nowrap}
+.table th:first-child{border-radius:8px 0 0 8px}
+.table th:last-child{border-radius:0 8px 8px 0}
+.table td{padding:9px 12px;border-bottom:1px solid #35322e;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.table tr:last-child td{border-bottom:0}
+.table .empty{text-align:center;color:var(--sub);padding:26px}
+.badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;border:1px solid}
+.badge.ok{color:var(--green);border-color:#2f6b4b;background:#152a20}
+.badge.warn{color:var(--gold);border-color:#6b5a2f;background:#2a2415}
+.badge.bad{color:var(--red);border-color:#6b3a2f;background:#2a1715}
+footer{color:#7d766c;font-size:12px;text-align:right;margin-top:18px}
+pre{margin:0;white-space:pre-wrap;word-break:break-word;background:#100f0e;border:1px solid #35322e;border-radius:8px;padding:12px;font-size:12px;max-height:260px;overflow:auto}
+@media(max-width:720px){.app{padding:18px 14px}.grid{grid-template-columns:1fr}h1{font-size:20px}.table td,.table th{padding:8px}.table td:nth-child(4),.table th:nth-child(4){display:none}}
 </style>
 </head>
 <body>
 <div class="app">
-  <header class="top">
-    <div class="identity">
-      <div class="symbol" aria-hidden="true"><svg viewBox="0 0 88 70"><circle cx="37" cy="31" r="26"/><path d="M11 31h45M37 5c-17 14-18 36 0 51M37 5c16 12 17 31 7 45M16 18h42"/><circle cx="59" cy="51" r="16" fill="#191713"/><path d="M59 41v11l8 5"/></svg></div>
-      <div><h1>Codex Timezone Sync</h1><div class="subtitle">同步 Codex 请求时区与出口节点时区</div></div>
+  <header>
+    <div class="symbol" aria-hidden="true"><svg viewBox="0 0 64 64"><circle cx="28" cy="28" r="20"/><path d="M8 28h40M28 8c-13 11-14 28 0 40M28 8c12 9 13 24 6 35"/><circle cx="44" cy="44" r="13" fill="#191713"/><path d="M44 36v9l6 4"/></svg></div>
+    <div>
+      <h1>Codex Timezone Sync</h1>
+      <div class="subtitle">离线时区校正 · 选择本地与目标时区即可</div>
     </div>
-    <div class="toptools"><button class="square" id="top-refresh" title="刷新信息" aria-label="刷新信息"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5 9A8 8 0 0 1 19 7l1 5M4 12l1 5a8 8 0 0 0 14-2"/></svg></button></div>
   </header>
+
   <section class="auth" aria-label="管理接口连接">
-    <label for="management-key">管理密钥</label><input id="management-key" type="password" autocomplete="off" placeholder="输入 CPA Management Key"/>
-    <button id="connect" class="outline" style="min-height:40px">连接</button>
-    <div id="connection" class="helper" role="status">优先复用 CPA Management 已记住的登录凭据。未启用记住密码时需重新输入；插件不另行存储密钥。</div>
+    <label for="management-key">管理密钥</label>
+    <input id="management-key" type="password" autocomplete="off" placeholder="输入 CPA Management Key">
+    <button id="connect" class="ghost">连接</button>
+    <div id="connection" class="helper" role="status">优先复用 CPA 管理界面已记住的凭据；插件不存储密钥。</div>
   </section>
-  <div class="tabs" role="tablist" aria-label="管理面板">
-    <button class="tab" role="tab" aria-selected="true" data-view="overview">概览</button>
-    
-    
-    <button class="tab" role="tab" aria-selected="false" data-view="settings">设置</button>
-  </div>
-  <main>
-    <section id="overview-view">
-      <div class="panel status">
-        <div class="stat"><label>同步状态</label><strong id="sync-state" class="muted">等待连接</strong></div>
-        <div class="stat"><label>当前时区</label><strong id="zone">—</strong></div>
-        <div class="stat"><label>出口时区偏移</label><strong id="offset">—</strong></div>
-        <div class="stat"><label>出口 IP</label><strong id="ip">—</strong></div>
-        <div class="status-btn"><button class="gold" id="refresh"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9M21 3v7h-7"/></svg>刷新状态</button></div>
+
+  <section class="panel">
+    <div class="row" style="margin-bottom:14px">
+      <h2 style="margin:0">时区设置</h2>
+      <div style="display:flex;gap:10px">
+        <button id="save" class="action">保存设置</button>
       </div>
-      <div class="panel metrics" aria-label="请求校正统计">
-        <span>成功修改 <strong class="positive" id="count-success">—</strong></span>
-        <span>失败修改 <strong class="danger" id="count-failure">—</strong></span>
-        <div class="bar-actions"><button class="outline" id="clear-stats">清空统计</button></div>
-      </div>
-      <div class="content-grid">
-        <div class="panel">
-          <h2><span class="section-icon">⚙</span>核心功能</h2>
-          <div class="feature-head"><span>功能</span><span>说明</span><span>状态</span><span>启用</span></div>
-          <div class="feature"><strong>启用时区同步</strong><span>将 Codex 请求时区与出口节点时区保持一致</span><span id="flag-sync" class="muted">—</span><label class="switch"><input id="toggle-sync" type="checkbox" disabled aria-label="启用时区同步"><span></span></label></div>
-          <div class="feature"><strong>出口时区检测</strong><span>读取出口 IP 与 IANA 时区</span><span id="flag-state" class="muted">—</span><button id="probe-egress" class="outline" style="min-height:34px;padding:4px 12px">获取</button></div>
-          <div class="feature"><strong>请求日期校正</strong><span>替换现有环境时区与日期，缺失时自动补入</span><span id="flag-rewrite" class="muted">—</span><span class="muted">随同步</span></div>
-          <div class="feature"><strong>上游模型一致性</strong><span>只读比较入站请求与上游响应报告的模型</span><span class="positive">● 监测中</span><span class="muted">只读</span></div>
-          <div class="feature"><strong>记录请求日志</strong><span>普通活动日志仅记录校正结果；失败请求单独保存</span><span id="flag-log" class="muted">—</span><label class="switch"><input id="toggle-log" type="checkbox" disabled aria-label="记录请求日志"><span></span></label></div>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <strong>本地时区（请求中的原时区）</strong>
+        <select id="local-zone" aria-label="本地时区"></select>
+        <div class="readout">
+          <span>当前时间</span><b id="local-time">—</b>
+          <span>偏移</span><b id="local-offset">—</b>
         </div>
-        <aside class="panel operations"><h2><span class="section-icon">🔧</span>操作</h2><div class="divider"></div>
-          <button class="gold" id="selftest"><svg viewBox="0 0 24 24"><path d="m8 5 11 7-11 7z"/></svg>测试同步</button>
-          <button class="outline" id="refresh2"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5 9A8 8 0 0 1 19 7M5 17a8 8 0 0 0 14-2"/></svg>刷新信息</button>
-          <button class="outline" id="save"><svg viewBox="0 0 24 24"><path d="M5 3h13l3 3v15H3V3zM7 3v7h10V3M7 21v-8h10v8"/></svg>保存设置</button>
-          <p class="hint">测试同步是本地请求改写自检，不会发送真实 Codex 请求。</p>
-          <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
-        </aside>
       </div>
-      <section class="panel log-panel"><div class="bar"><div><h2>最近活动 · 时区与模型监测</h2><p>显示协议、原始时区、校正时区及上游报告模型；未提供的数据标记为未知。</p></div><div class="bar-actions"><button class="outline" id="refresh-activity">刷新活动</button><button class="outline" id="clear-activity">清空</button></div></div><div class="table-wrap"><table class="table"><thead><tr><th>时间</th><th>协议</th><th>校正前时区</th><th>校正后时区</th><th>请求模型</th><th>上游模型</th><th>状态</th></tr></thead><tbody id="recent-body"><tr><td colspan="7" class="empty">连接后显示活动</td></tr></tbody></table></div></section>
-      <section class="panel log-panel"><div class="bar"><div><h2>校正失败日志</h2><p>只保存校正失败的 Codex 请求体。可能包含完整提示词等敏感内容，请限制管理密钥及日志文件的访问权限。</p></div><div class="bar-actions"><button class="outline" id="refresh-failures">刷新失败日志</button><button class="outline" id="clear-failures">清空失败日志</button></div></div>
-        <div class="table-wrap"><table class="table"><thead><tr><th>时间</th><th>协议</th><th>失败原因</th><th>请求大小</th><th>请求详情</th></tr></thead><tbody id="failure-body"><tr><td colspan="5" class="empty">连接后显示失败日志</td></tr></tbody></table></div>
-        <p id="failure-description" class="hint">点击“查看”后才会读取完整请求体。</p><pre id="failure-json" class="request-preview" hidden></pre>
-      </section>
-    </section>
-    <section id="settings-view" class="panel"><h2>设置说明</h2><div class="settings-grid"><div class="setting-card"><strong>生效方式</strong><p>在「概览」修改开关后点击「保存设置」，配置立即生效，不需要重启 CPA。</p></div><div class="setting-card"><strong>出口时区来源</strong><p>定时任务及手动获取均由服务器宿主机通过 Mihomo 探测，手动获取需要刷新辅助服务运行。</p></div><div class="setting-card"><strong>日志与隐私</strong><p>普通活动记录不保存提示词；失败日志独立保存完整 Codex 请求体（可能含敏感信息），权限为 0600，单文件上限 48 MiB。</p></div><div class="setting-card"><strong>状态有效期</strong><p>检测记录超过两小时将被视为过期，插件暂停注入，以免使用错误时区。</p></div></div></section>
-  </main>
-  <div class="footer" id="updated">未连接管理接口</div>
+      <div class="card">
+        <strong>目标时区（写入请求的时区）</strong>
+        <select id="target-zone" aria-label="目标时区"></select>
+        <div class="readout">
+          <span>当前时间</span><b id="target-time">—</b>
+          <span>偏移</span><b id="target-offset">—</b>
+        </div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:16px">
+      <label class="toggle"><input id="toggle-sync" type="checkbox"><span class="track"></span><span>启用时区改写</span></label>
+      <label class="toggle"><input id="toggle-log" type="checkbox"><span class="track"></span><span>记录最近改写</span></label>
+    </div>
+    <div id="feedback" class="feedback" role="status"></div>
+  </section>
+
+  <section class="panel">
+    <div class="row" style="margin-bottom:12px">
+      <h2 style="margin:0">校验</h2>
+      <div style="display:flex;gap:8px">
+        <button id="selftest" class="ghost">运行自检</button>
+        <button id="refresh" class="ghost">刷新状态</button>
+      </div>
+    </div>
+    <pre id="selftest-output" hidden></pre>
+    <div id="selftest-hint" class="feedback">自检会用一条样例请求演练改写，不会发送到上游。</div>
+  </section>
+
+  <section class="panel">
+    <div class="row" style="margin-bottom:12px">
+      <h2 style="margin:0">最近改写</h2>
+      <button id="clear-events" class="ghost">清空记录</button>
+    </div>
+    <table class="table">
+      <thead><tr><th>时间</th><th>结果</th><th>原时区</th><th>目标时区</th><th>日期</th></tr></thead>
+      <tbody id="events-body"><tr><td class="empty" colspan="5">暂无记录</td></tr></tbody>
+    </table>
+  </section>
+
+  <footer id="updated">未连接管理接口</footer>
 </div>
 <script>
 'use strict';
 (() => {
-  const path='/v0/management/plugins/codex-timezone-sync/';
+  const base='/v0/management/plugins/codex-timezone-sync/';
   const $=id=>document.getElementById(id);
-  function savedManagementKey(){
+  let key='';
+  let zones=[];
+  let status=null;
+
+  function rememberedKey(){
     try {
-      const stored=localStorage.getItem('cli-proxy-auth');if(!stored)return '';
+      const stored=localStorage.getItem('cli-proxy-auth');
+      if(!stored)return '';
       let decoded=stored;
       if(stored.startsWith('enc::v1::')){
         const bytes=Uint8Array.from(atob(stored.slice(9)),c=>c.charCodeAt(0));
-        const password=new TextEncoder().encode('cli-proxy-api-webui::secure-storage|'+location.host+'|'+navigator.userAgent);
-        decoded=new TextDecoder('utf-8',{fatal:true}).decode(bytes.map((b,i)=>b^password[i%password.length]));
+        const secret=new TextEncoder().encode('cli-proxy-api-webui::secure-storage|'+location.host+'|'+navigator.userAgent);
+        decoded=new TextDecoder('utf-8',{fatal:true}).decode(bytes.map((b,i)=>b^secret[i%secret.length]));
       }
-      const value=JSON.parse(decoded);const state=value?.state;
+      const state=JSON.parse(decoded)?.state;
       return state?.rememberPassword===true && typeof state.managementKey==='string'?state.managementKey:'';
-    } catch{return '';}
+    } catch { return ''; }
   }
-  let managementKey='';
-  let status=null;
-  let logs=[];
-  let models={matched:0,mismatched:0,unknown:0,records:[]};
-  let stats={success:0,failure:0};
-  let failures=[];
-  const select=(name,on)=>{const node=$(name);node.textContent=on?'● 正常':'● 关闭';node.className=on?'positive':'muted';};
-  function feedback(message,error=false) {const node=$('feedback');node.textContent=message;node.className=error?'feedback error':'feedback';}
-  async function api(endpoint,method='GET',data=null) {
-    if(!managementKey)throw new Error('请先输入管理密钥并连接');
-    const res=await fetch(path+endpoint,{method,cache:'no-store',headers:{'Authorization':'Bearer '+managementKey,...(data?{'Content-Type':'application/json'}:{})},...(data?{body:JSON.stringify(data)}:{})});
-    if(!res.ok) {
-      if(res.status===401||res.status===403)throw new Error('管理密钥无效或没有访问权限');
-      const err=await res.json().catch(()=>null);
-      throw new Error(err?.reason||err?.error||'请求失败（HTTP '+res.status+'）');
+
+  function feedback(message,error=false){
+    const node=$('feedback');
+    node.textContent=message;
+    node.className=error?'feedback error':'feedback';
+  }
+
+  async function api(endpoint,method='GET',data=null){
+    if(!key)throw new Error('请先输入管理密钥并连接');
+    const options={method,cache:'no-store',headers:{Authorization:'Bearer '+key}};
+    if(data!==null){options.headers['Content-Type']='application/json';options.body=JSON.stringify(data);}
+    const response=await fetch(base+endpoint,options);
+    if(!response.ok){
+      if(response.status===401||response.status===403)throw new Error('管理密钥无效或没有访问权限');
+      const detail=await response.json().catch(()=>null);
+      throw new Error(detail?.reason||detail?.error||'请求失败（HTTP '+response.status+'）');
     }
-    return res.json();
+    return response.json();
   }
-  function renderStatus() {
-    if(!status)return;
-    const enabled=status.settings.enabled, ok=status.available;
-    const state=$('sync-state');state.textContent=!enabled?'● 已暂停':ok?'● 运行中':'● 状态过期';state.className=enabled&&ok?'big-status':enabled?'danger':'muted';
-    $('zone').textContent=ok?status.timezone:'暂无有效时区';
-    $('offset').textContent=ok?`${status.abbreviation} / UTC${status.offset}`:'—';
-    $('ip').textContent=ok?(status.ip||'未知'):'—';
-    $('toggle-sync').checked=enabled;$('toggle-log').checked=status.settings.logging;
-    $('toggle-sync').disabled=false;$('toggle-log').disabled=false;
-    select('flag-sync',enabled);select('flag-state',ok);select('flag-rewrite',enabled&&ok);select('flag-log',status.settings.logging);
-    $('updated').textContent=`上次刷新：${new Date().toLocaleString('zh-CN')} · 状态记录约 ${ok?Math.floor(status.age_seconds/60)+' 分钟前':'不可用'}`;
-  }
-  function renderStats(){
-    $('count-success').textContent=stats.success;
-    $('count-failure').textContent=stats.failure;
-  }
-  function renderActivity(){
-    const el=$('recent-body');el.replaceChildren();
-    const records=Array.isArray(models.records)?models.records:[];
-    const rows=[];
-    const modelUsed=new Set();
-    // Associate audit and model metadata only where the timestamp is sufficiently close.
-    // No guesswork: with ambiguous candidates, keep two separate rows.
-    for(const event of logs){
-      if(event.result==='model_match'||event.result==='model_mismatch')continue;
-      const matches=records.map((record,i)=>({record,i})).filter(({record,i})=>
-        !modelUsed.has(i)&&Math.abs(record.timestamp-event.timestamp)<=5 &&
-        (!event.timezone_before||event.timezone_before==='unknown'||!record.timezone_before||record.timezone_before===event.timezone_before));
-      const match=matches.length===1?matches[0]:null;
-      if(match)modelUsed.add(match.i);
-      rows.push({timestamp:event.timestamp,before:event.timezone_before||match?.record.timezone_before||'unknown',after:event.timezone||match?.record.timezone_after||'unknown',model:match?.record.requested_model||'unknown',upstream:match?.record.upstream_model||'unknown',status:match?.record.status||event.result});
-    }
-    records.forEach((record,i)=>{if(!modelUsed.has(i))rows.push({timestamp:record.timestamp,before:record.timezone_before||'unknown',after:record.timezone_after||'unknown',model:record.requested_model||'unknown',upstream:record.upstream_model||'unknown',status:record.status||'unknown'});});
-    rows.sort((a,b)=>b.timestamp-a.timestamp);
-    if(!rows.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=7;td.className='empty';td.textContent='暂无活动记录';tr.append(td);el.append(tr);return;}
-    const states={matched:'● 模型一致',mismatched:'● 模型不一致',unknown:'○ 无法确认',rewritten:'● 时区已校正',skipped:'○ 未改写'};
-    for(const event of rows.slice(0,60)){
-      const tr=document.createElement('tr');
-      const values=[new Date(event.timestamp*1000).toLocaleString('zh-CN'),'Codex',event.before,event.after,event.model,event.upstream,states[event.status]||'○ 无法确认'];
-      for(const value of values){const td=document.createElement('td');td.textContent=value==='unknown'?'未知':value;tr.append(td);}el.append(tr);
-    }
-  }
-  function renderFailures(){
-    const body=$('failure-body');body.replaceChildren();
-    if(!failures.length){
-      const tr=document.createElement('tr'),td=document.createElement('td');
-      td.colSpan=5;td.className='empty';td.textContent='暂无校正失败日志';
-      tr.append(td);body.append(tr);return;
-    }
-    const names={invalid_base64:'Body 编码无效',invalid_body:'Body 缺失',state_unavailable:'出口时区不可用',rewrite_failed:'请求校正失败',encode_failed:'重编码失败',response_failed:'响应构造失败'};
-    for(const item of failures) {
-      const tr=document.createElement('tr');
-      for(const value of [new Date(item.timestamp*1000).toLocaleString('zh-CN'),'Codex',names[item.reason]||item.reason,item.size+' B']){
-        const td=document.createElement('td');td.textContent=value;tr.append(td);
+
+  function zoneOptions(select,selected){
+    if(!select.options.length){
+      const fragment=document.createDocumentFragment();
+      for(const zone of zones){
+        const option=document.createElement('option');
+        option.value=zone;
+        option.textContent=zone;
+        fragment.appendChild(option);
       }
-      const td=document.createElement('td'),button=document.createElement('button');
-      button.className='outline';button.textContent='查看';button.style.minHeight='32px';
-      button.addEventListener('click',()=>guarded(async()=>{
-        const detail=await api('failures/view','POST',{id:item.id});
-        const decoded=new TextDecoder().decode(Uint8Array.from(atob(detail.body_base64),c=>c.charCodeAt(0)));
-        let formatted=decoded;
-        if(detail.kind==='decoded-body'){
-          try{formatted=JSON.stringify(JSON.parse(decoded),null,2);}catch{}
+      select.appendChild(fragment);
+    }
+    if(selected&&zones.includes(selected))select.value=selected;
+  }
+
+  function renderStatus(){
+    if(!status)return;
+    const settings=status.settings;
+    zoneOptions($('local-zone'),settings.local_zone);
+    zoneOptions($('target-zone'),settings.target_zone);
+    $('toggle-sync').checked=!!settings.enabled;
+    $('toggle-log').checked=!!settings.logging;
+    for(const id of ['local-zone','target-zone','toggle-sync','toggle-log'])$(id).disabled=false;
+    $('local-time').textContent=status.local.time?`${status.local.date} ${status.local.time}`:'—';
+    $('local-offset').textContent=status.local.offset?`${status.local.abbreviation} · UTC${status.local.offset}`:'—';
+    $('target-time').textContent=status.target.time?`${status.target.date} ${status.target.time}`:'—';
+    $('target-offset').textContent=status.target.offset?`${status.target.abbreviation} · UTC${status.target.offset}`:'—';
+    $('updated').textContent=`插件 v${status.version} · 内置 ${status.timezones} 个时区 · 更新于 ${new Date().toLocaleString('zh-CN')}`;
+  }
+
+  const labels={rewritten:['ok','已改写'],unchanged:['warn','无需改写'],failed:['bad','失败']};
+
+  function renderEvents(events){
+    const body=$('events-body');
+    body.replaceChildren();
+    if(!events.length){
+      const row=document.createElement('tr');
+      const cell=document.createElement('td');
+      cell.className='empty';
+      cell.colSpan=5;
+      cell.textContent='暂无记录';
+      row.appendChild(cell);
+      body.appendChild(row);
+      return;
+    }
+    for(const event of events){
+      const row=document.createElement('tr');
+      const kind=labels[event.result]||['warn',event.result];
+      const values=[
+        new Date(event.timestamp*1000).toLocaleString('zh-CN'),
+        kind,
+        event.timezone_from||'（无）',
+        event.timezone_to||'—',
+        event.date||'—',
+      ];
+      for(const [index,value] of values.entries()){
+        const cell=document.createElement('td');
+        if(index===1){
+          const badge=document.createElement('span');
+          badge.className='badge '+kind[0];
+          badge.textContent=kind[1];
+          cell.appendChild(badge);
+        } else {
+          cell.textContent=value;
         }
-        $('failure-description').textContent='失败原因：'+(names[detail.reason]||detail.reason)+' · '+(detail.kind==='encoded-field'?'原始编码字段':'原始请求体');
-        $('failure-json').textContent=formatted;$('failure-json').hidden=false;
-      }));
-      td.append(button);tr.append(td);body.append(tr);
+        row.appendChild(cell);
+      }
+      body.appendChild(row);
     }
   }
-  async function refresh(){
-    if(!managementKey){feedback('请先连接管理接口',true);return;}
-    try {
-      const [s,l,m,c,f]=await Promise.all([api('status'),api('logs'),api('models').catch(()=>({matched:0,mismatched:0,unknown:0,records:[]})),api('stats'),api('failures')]);
-      status=s;logs=l.events||[];models=m;stats=c;failures=f.records||[];
-      renderStatus();renderStats();renderActivity();renderFailures();feedback('信息已更新');
-      $('connection').textContent='● 已连接 CPA 管理接口';$('connection').className='helper connected';
-    } catch(err){feedback(err.message,true);throw err;}
+
+  async function loadEvents(){
+    if(!key)return;
+    try { renderEvents((await api('events')).events||[]); }
+    catch (error) { feedback(error.message,true); }
   }
-  async function guarded(action){try{await action();}catch(err){feedback(err.message,true);}}
-  $('connect').addEventListener('click',()=>guarded(async()=>{managementKey=$('management-key').value.trim();await refresh();$('management-key').value='';}));
-  const savedKey=savedManagementKey();
-  if(savedKey){managementKey=savedKey;guarded(refresh);}
-  $('management-key').addEventListener('keydown',e=>{if(e.key==='Enter')$('connect').click();});
-  for(const id of ['refresh','refresh2','top-refresh','refresh-activity'])$(id).addEventListener('click',()=>guarded(refresh));
-  $('clear-activity').addEventListener('click',()=>guarded(async()=>{
-    await api('activity/clear','POST');logs=[];models={matched:0,mismatched:0,unknown:0,records:[]};
-    renderActivity();feedback('最近活动已清空');
+
+  async function refresh(){
+    try {
+      if(!zones.length)zones=(await api('timezones')).zones||[];
+      status=await api('status');
+      renderStatus();
+      await loadEvents();
+      $('connection').textContent='已连接管理接口';
+      $('connection').className='helper connected';
+      feedback('');
+    } catch (error) {
+      feedback(error.message,true);
+      $('connection').textContent='未连接';
+      $('connection').className='helper';
+    }
+  }
+
+  async function guarded(task){
+    try { feedback(''); await task(); }
+    catch (error) { feedback(error.message,true); }
+  }
+
+  $('connect').addEventListener('click',()=>guarded(async()=>{
+    key=$('management-key').value.trim()||rememberedKey();
+    if(!key)throw new Error('请输入 CPA Management Key');
+    $('management-key').value='';
+    await refresh();
   }));
-  $('clear-stats').addEventListener('click',()=>guarded(async()=>{
-    await api('stats/clear','POST');stats={success:0,failure:0};renderStats();feedback('校正统计已清空');
+
+  $('management-key').addEventListener('keydown',event=>{
+    if(event.key==='Enter')$('connect').click();
+  });
+
+  $('save').addEventListener('click',()=>guarded(async()=>{
+    await api('settings','PUT',{
+      enabled:$('toggle-sync').checked,
+      logging:$('toggle-log').checked,
+      local_zone:$('local-zone').value,
+      target_zone:$('target-zone').value,
+    });
+    await refresh();
+    feedback('设置已保存，下一次 Codex 请求立即生效。');
   }));
-  $('refresh-failures').addEventListener('click',()=>guarded(refresh));
-  $('clear-failures').addEventListener('click',()=>guarded(async()=>{
-    await api('failures/clear','POST');failures=[];renderFailures();
-    $('failure-json').textContent='';$('failure-json').hidden=true;
-    $('failure-description').textContent='失败日志已清空';feedback('失败日志已清空');
+
+  $('refresh').addEventListener('click',()=>guarded(refresh));
+
+  $('selftest').addEventListener('click',()=>guarded(async()=>{
+    const result=await api('selftest','POST',{});
+    const output=$('selftest-output');
+    output.hidden=false;
+    output.textContent=`目标时区：${result.target_zone}\n目标日期：${result.date}\n\n${result.sample||''}`;
+    $('selftest-hint').textContent='自检通过：改写逻辑正常。';
   }));
-  $('probe-egress').addEventListener('click',()=>guarded(async()=>{
-    const button=$('probe-egress');button.disabled=true;
-    try{
-      const result=await api('egress/refresh','POST');
-      await refresh();
-      feedback('出口时区检测完成：'+result.timezone+' / '+result.ip);
-    }finally{button.disabled=false;}
+
+  $('clear-events').addEventListener('click',()=>guarded(async()=>{
+    await api('events/clear','POST',{});
+    await loadEvents();
+    feedback('记录已清空。');
   }));
-  $('save').addEventListener('click',()=>guarded(async()=>{if(!status)throw new Error('请先连接管理接口');await api('settings','PUT',{enabled:$('toggle-sync').checked,logging:$('toggle-log').checked});await refresh();feedback('配置已保存并立即生效');}));
-  $('selftest').addEventListener('click',()=>guarded(async()=>{const result=await api('selftest','POST');feedback('本地自检通过：'+result.timezone+'（未请求 Codex）');}));
-  document.querySelectorAll('.tab').forEach(tab=>tab.addEventListener('click',()=>{for(const t of document.querySelectorAll('.tab'))t.setAttribute('aria-selected',String(t===tab));for(const v of ['overview','settings']){$(v+'-view').classList.toggle('active',v===tab.dataset.view && v!=='overview');if(v==='overview')$('overview-view').classList.toggle('hidden',v!==tab.dataset.view);}}));
+
+  $('management-key').value=rememberedKey()?'':'';
+  if(rememberedKey()){
+    key=rememberedKey();
+    refresh();
+  }
 })();
 </script>
 </body>
