@@ -7,20 +7,10 @@
 <title>Codex 离线时区同步</title>
 <style>
 /* Palette mirrors the CPA Management Center tokens so the panel reads as part
-   of the host instead of an embedded third-party page. */
+   of the host instead of an embedded third-party page. The default is the
+   host's pure-white variant, which is what its "auto" theme resolves to in a
+   light system and therefore what most installs actually show. */
 :root{
-  color-scheme:light;
-  --bg:#faf9f5;--surface:#ffffff;--card:#ffffff;--card-2:#faf9f5;--sunken:#f6f4ee;--head:#f0eee8;
-  --line:#e3e1db;--line-soft:#eae7e1;--line-hover:#cecac4;
-  --text:#2d2a26;--sub:#6d6760;--muted:#a29c95;
-  --accent:#8b8680;--accent-hover:#7f7a74;--accent-ink:#ffffff;--accent-ring:rgba(139,134,128,.24);
-  --green:#0f9d76;--green-line:#6ee7b7;--green-bg:#d1fae5;
-  --amber:#92400e;--amber-line:#e8cfa0;--amber-bg:#fdf3e3;
-  --red:#c65746;--red-line:rgba(198,87,70,.35);--red-bg:rgba(198,87,70,.12);
-  --track:#d5d2cb;--track-line:#cecac4;--knob:#ffffff;
-  --shadow:0 1px 2px rgb(0 0 0 / .08);--shadow-pop:0 12px 26px rgb(0 0 0 / .14);
-}
-html[data-theme=white]{
   color-scheme:light;
   --bg:#ffffff;--surface:#ffffff;--card:#ffffff;--card-2:#ffffff;--sunken:#fafafa;--head:#f6f6f6;
   --line:#e5e5e5;--line-soft:#eeeeee;--line-hover:#cccccc;
@@ -31,6 +21,21 @@ html[data-theme=white]{
   --red:#c65746;--red-line:rgba(198,87,70,.35);--red-bg:rgba(198,87,70,.12);
   --track:#d9d9d9;--track-line:#cccccc;--knob:#ffffff;
   --shadow:0 1px 2px rgb(0 0 0 / .08);--shadow-pop:0 12px 26px rgb(0 0 0 / .12);
+}
+html[data-theme=white]{color-scheme:light}
+/* The host's warm "light" theme is paper-tinted; mirror it so a framed panel
+   never shows a seam against the surrounding page. */
+html[data-theme=light]{
+  color-scheme:light;
+  --bg:#faf9f5;--surface:#ffffff;--card:#ffffff;--card-2:#faf9f5;--sunken:#f6f4ee;--head:#f0eee8;
+  --line:#e3e1db;--line-soft:#eae7e1;--line-hover:#cecac4;
+  --text:#2d2a26;--sub:#6d6760;--muted:#a29c95;
+  --accent:#8b8680;--accent-hover:#7f7a74;--accent-ink:#ffffff;--accent-ring:rgba(139,134,128,.24);
+  --green:#0f9d76;--green-line:#6ee7b7;--green-bg:#d1fae5;
+  --amber:#92400e;--amber-line:#e8cfa0;--amber-bg:#fdf3e3;
+  --red:#c65746;--red-line:rgba(198,87,70,.35);--red-bg:rgba(198,87,70,.12);
+  --track:#d5d2cb;--track-line:#cecac4;--knob:#ffffff;
+  --shadow:0 1px 2px rgb(0 0 0 / .08);--shadow-pop:0 12px 26px rgb(0 0 0 / .14);
 }
 html[data-theme=dark]{color-scheme:dark;
   --bg:#151412;--surface:#1d1b18;--card:#1d1b18;--card-2:#191714;--sunken:#141311;--head:#262320;
@@ -80,20 +85,25 @@ h1{font-size:24px;margin:0;font-weight:700}
 .combo.open .caret{transform:rotate(180deg)}
 .combo-pop{position:absolute;z-index:40;top:calc(100% + 6px);left:0;right:0;display:none;padding:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-pop)}
 .combo.open .combo-pop{display:block}
-.combo-search{width:100%;padding:8px 10px;margin-bottom:6px;color:var(--text);background:var(--sunken);border:1px solid var(--line);border-radius:7px}
+.combo-search{width:100%;padding:9px 11px;margin-bottom:8px;color:var(--text);background:var(--sunken);border:1px solid var(--line);border-radius:8px;transition:border-color .15s,box-shadow .15s}
+.combo-search::placeholder{color:var(--muted)}
 .combo-search:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-ring)}
-.combo-list{max-height:264px;margin:0;padding:0;overflow:auto;list-style:none;overscroll-behavior:contain}
-.combo-opt{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 10px;border-radius:6px;font-size:14px;cursor:pointer}
+.combo-list{max-height:min(52vh,340px);margin:0;padding:0;overflow:auto;list-style:none;overscroll-behavior:contain;scrollbar-width:thin}
+.combo-list::-webkit-scrollbar{width:10px}
+.combo-list::-webkit-scrollbar-thumb{background:var(--line-hover);border:3px solid var(--surface);border-radius:6px}
+.combo-list::-webkit-scrollbar-thumb:hover{background:var(--sub)}
+.combo-list::-webkit-scrollbar-track{background:transparent}
+.combo-opt{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border-radius:7px;font-size:14px;cursor:pointer;transition:background .12s,color .12s}
 .combo-opt:hover{background:var(--head)}
-.combo-opt.active{background:var(--head)}
-.combo-opt[aria-selected=true]{font-weight:600}
+.combo-opt.active{background:var(--head);box-shadow:inset 2px 0 0 var(--accent)}
+.combo-opt[aria-selected=true]{font-weight:600;color:var(--accent)}
 .combo-opt[aria-selected=true]::after{content:"✓";margin-left:auto;color:var(--accent);font-size:12px}
 .combo-opt[aria-selected=true] .combo-off{margin-left:8px}
 .combo-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .combo-name mark{background:transparent;color:var(--accent);font-weight:700}
-.combo-off{flex:none;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
-.combo-empty,.combo-more{padding:12px 10px;color:var(--sub);font-size:13px;text-align:center}
-.combo-more{color:var(--muted);font-size:12px}
+.combo-off{flex:none;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;padding:1px 7px;border-radius:9px;background:var(--sunken);border:1px solid var(--line-soft)}
+.combo-empty{padding:16px 10px;color:var(--sub);font-size:13px;text-align:center}
+.combo-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 4px 1px;color:var(--muted);font-size:12px}
 
 .readout{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin-top:12px;font-size:13px}
 .readout span{color:var(--sub)}
@@ -129,6 +139,10 @@ pre{margin:0;white-space:pre-wrap;word-break:break-word;background:var(--sunken)
 </style>
 <script>
 // Resolve the theme before first paint: host attribute, then host storage, then system.
+// The host writes data-theme='dark' / 'white' and *removes* it for its explicit
+// "light" (paper-tinted) choice, so an absent attribute inside the frame means
+// paper, not "unknown". Standalone, no host attribute exists at all, and the
+// panel must fall back to the host's default look: pure white on a light system.
 window.__tzTheme=function(){
   try{
     if(window.parent!==window){
@@ -136,6 +150,7 @@ window.__tzTheme=function(){
       if(host==='dark')return 'dark';
       if(host==='white')return 'white';
       if(host==='light')return 'light';
+      return 'light';
     }
   }catch(e){}
   try{
@@ -143,8 +158,11 @@ window.__tzTheme=function(){
     var theme=saved&&saved.state?saved.state.theme:'';
     if(theme==='dark')return 'dark';
     if(theme==='white')return 'white';
+    if(theme==='light')return 'light';
   }catch(e){}
-  return window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+  // Standalone (or host "auto"): match the host's auto resolution, which is the
+  // pure-white palette in a light system rather than the paper one.
+  return window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'white';
 };
 document.documentElement.setAttribute('data-theme',window.__tzTheme());
 </script>
@@ -182,8 +200,9 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
             <svg class="caret" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
           </button>
           <div class="combo-pop">
-            <input class="combo-search" type="text" placeholder="搜索时区，如 shanghai、tokyo、new york" autocomplete="off" spellcheck="false">
+            <input class="combo-search" type="text" placeholder="搜索国家、城市或时区，如 japan、shanghai" autocomplete="off" spellcheck="false">
             <ul class="combo-list" role="listbox" aria-label="时区候选"></ul>
+            <div class="combo-foot"><span class="combo-count"></span><span>↑↓ 选择 · Enter 确认</span></div>
           </div>
         </div>
         <div class="readout">
@@ -199,8 +218,9 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
             <svg class="caret" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
           </button>
           <div class="combo-pop">
-            <input class="combo-search" type="text" placeholder="搜索时区，如 shanghai、tokyo、new york" autocomplete="off" spellcheck="false">
+            <input class="combo-search" type="text" placeholder="搜索国家、城市或时区，如 japan、shanghai" autocomplete="off" spellcheck="false">
             <ul class="combo-list" role="listbox" aria-label="时区候选"></ul>
+            <div class="combo-foot"><span class="combo-count"></span><span>↑↓ 选择 · Enter 确认</span></div>
           </div>
         </div>
         <div class="readout">
@@ -247,7 +267,6 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
 (() => {
   const base='/v0/management/plugins/codex-timezone-sync-local/';
   const $=id=>document.getElementById(id);
-  const LIST_LIMIT=60;
   let key='';
   let zones=[];
   let status=null;
@@ -333,39 +352,405 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
     return index===needle.length;
   }
 
-  // Common city names that do not appear in the IANA id, so typing "beijing"
-  // still reaches Asia/Shanghai instead of returning nothing.
+  // Country, city and Chinese names that never appear in the IANA id, so typing
+  // "japan", "beijing" or "日本" still reaches Asia/Tokyo / Asia/Shanghai.
+  // Values may be one zone or an array; each entry is validated against the
+  // built-in zone list, so a stale id here can never surface a dead option.
   const ALIASES={
-    'beijing':'Asia/Shanghai','shanghai':'Asia/Shanghai','guangzhou':'Asia/Shanghai',
-    'shenzhen':'Asia/Shanghai','chengdu':'Asia/Shanghai','chongqing':'Asia/Shanghai',
-    'hangzhou':'Asia/Shanghai','wuhan':"Asia/Shanghai",'xian':'Asia/Shanghai',
-    'hongkong':'Asia/Hong_Kong','hong kong':'Asia/Hong_Kong','macau':'Asia/Macau',
-    'taipei':'Asia/Taipei','tokyo':'Asia/Tokyo','osaka':'Asia/Tokyo',
-    'seoul':'Asia/Seoul','singapore':'Asia/Singapore','bangkok':'Asia/Bangkok',
-    'mumbai':'Asia/Kolkata','delhi':'Asia/Kolkata','kolkata':'Asia/Kolkata',
-    'dubai':'Asia/Dubai','jakarta':'Asia/Jakarta','manila':'Asia/Manila',
-    'hanoi':'Asia/Ho_Chi_Minh','saigon':'Asia/Ho_Chi_Minh','kualalumpur':'Asia/Kuala_Lumpur',
-    'sydney':'Australia/Sydney','melbourne':'Australia/Melbourne',
-    'perth':'Australia/Perth','auckland':'Pacific/Auckland',
-    'london':'Europe/London','paris':'Europe/Paris','berlin':'Europe/Berlin',
-    'madrid':'Europe/Madrid','rome':'Europe/Rome','amsterdam':'Europe/Amsterdam',
-    'zurich':'Europe/Zurich','vienna':'Europe/Vienna','stockholm':'Europe/Stockholm',
-    'oslo':'Europe/Oslo','helsinki':'Europe/Helsinki','dublin':'Europe/Dublin',
-    'lisbon':'Europe/Lisbon','warsaw':'Europe/Warsaw','prague':'Europe/Prague',
-    'athens':'Europe/Athens','istanbul':'Europe/Istanbul','moscow':'Europe/Moscow',
-    'kiev':'Europe/Kyiv','kyiv':'Europe/Kyiv',
-    'newyork':'America/New_York','boston':'America/New_York','washington':'America/New_York',
-    'miami':'America/New_York','atlanta':'America/New_York','toronto':'America/Toronto',
-    'chicago':'America/Chicago','dallas':'America/Chicago','houston':'America/Chicago',
-    'denver':'America/Denver','phoenix':'America/Phoenix',
-    'losangeles':'America/Los_Angeles','sanfrancisco':'America/Los_Angeles',
-    'seattle':'America/Los_Angeles','sandiego':'America/Los_Angeles',
-    'vancouver':'America/Vancouver','mexico':'America/Mexico_City',
-    'saopaulo':'America/Sao_Paulo','buenosaires':'America/Argentina/Buenos_Aires',
-    'lima':'America/Lima','bogota':'America/Bogota','santiago':'America/Santiago',
-    'cairo':'Africa/Cairo','lagos':'Africa/Lagos','nairobi':'Africa/Nairobi',
-    'johannesburg':'Africa/Johannesburg','casablanca':'Africa/Casablanca',
+  'alaska':'America/Anchorage',
+  'almaty':'Asia/Almaty',
+  'america':['America/New_York','America/Chicago','America/Denver','America/Los_Angeles'],
+  'amsterdam':'Europe/Amsterdam',
+  'argentina':'America/Argentina/Buenos_Aires',
+  'athens':'Europe/Athens',
+  'atlanta':'America/New_York',
+  'auckland':'Pacific/Auckland',
+  'australia':['Australia/Sydney','Australia/Melbourne','Australia/Brisbane','Australia/Adelaide','Australia/Perth','Australia/Darwin','Australia/Hobart'],
+  'austria':'Europe/Vienna',
+  'baghdad':'Asia/Baghdad',
+  'bali':'Asia/Makassar',
+  'bangalore':'Asia/Kolkata',
+  'bangkok':'Asia/Bangkok',
+  'bangladesh':'Asia/Dhaka',
+  'barcelona':'Europe/Madrid',
+  'beijing':'Asia/Shanghai',
+  'belarus':'Europe/Minsk',
+  'belgium':'Europe/Brussels',
+  'berlin':'Europe/Berlin',
+  'bogota':'America/Bogota',
+  'boston':'America/New_York',
+  'brazil':['America/Sao_Paulo','America/Manaus','America/Recife','America/Fortaleza','America/Bahia'],
+  'brisbane':'Australia/Brisbane',
+  'britain':'Europe/London',
+  'brussels':'Europe/Brussels',
+  'budapest':'Europe/Budapest',
+  'buenosaires':'America/Argentina/Buenos_Aires',
+  'bulgaria':'Europe/Sofia',
+  'cairo':'Africa/Cairo',
+  'cambodia':'Asia/Phnom_Penh',
+  'canada':['America/Toronto','America/Vancouver','America/Edmonton','America/Winnipeg','America/Halifax','America/St_Johns'],
+  'chengdu':'Asia/Shanghai',
+  'chicago':'America/Chicago',
+  'chile':'America/Santiago',
+  'china':['Asia/Shanghai','Asia/Urumqi'],
+  'chongqing':'Asia/Shanghai',
+  'colombia':'America/Bogota',
+  'colombo':'Asia/Colombo',
+  'czech':'Europe/Prague',
+  'czechia':'Europe/Prague',
+  'dallas':'America/Chicago',
+  'delhi':'Asia/Kolkata',
+  'denmark':'Europe/Copenhagen',
+  'denver':'America/Denver',
+  'dhaka':'Asia/Dhaka',
+  'doha':'Asia/Qatar',
+  'dubai':'Asia/Dubai',
+  'dublin':'Europe/Dublin',
+  'egypt':'Africa/Cairo',
+  'england':'Europe/London',
+  'ethiopia':'Africa/Addis_Ababa',
+  'finland':'Europe/Helsinki',
+  'france':'Europe/Paris',
+  'frankfurt':'Europe/Berlin',
+  'germany':'Europe/Berlin',
+  'gmt':'UTC',
+  'greece':'Europe/Athens',
+  'greenwich':'UTC',
+  'guangzhou':'Asia/Shanghai',
+  'hangzhou':'Asia/Shanghai',
+  'hanoi':'Asia/Ho_Chi_Minh',
+  'hawaii':'Pacific/Honolulu',
+  'helsinki':'Europe/Helsinki',
+  'hk':'Asia/Hong_Kong',
+  'hochiminh':'Asia/Ho_Chi_Minh',
+  'hongkong':'Asia/Hong_Kong',
+  'honolulu':'Pacific/Honolulu',
+  'houston':'America/Chicago',
+  'hungary':'Europe/Budapest',
+  'iceland':'Atlantic/Reykjavik',
+  'india':'Asia/Kolkata',
+  'indonesia':'Asia/Jakarta',
+  'iran':'Asia/Tehran',
+  'iraq':'Asia/Baghdad',
+  'ireland':'Europe/Dublin',
+  'israel':'Asia/Jerusalem',
+  'istanbul':'Europe/Istanbul',
+  'italy':'Europe/Rome',
+  'jakarta':'Asia/Jakarta',
+  'japan':'Asia/Tokyo',
+  'jerusalem':'Asia/Jerusalem',
+  'johannesburg':'Africa/Johannesburg',
+  'karachi':'Asia/Karachi',
+  'kathmandu':'Asia/Kathmandu',
+  'kazakhstan':'Asia/Almaty',
+  'kenya':'Africa/Nairobi',
+  'kiev':'Europe/Kyiv',
+  'korea':'Asia/Seoul',
+  'kualalumpur':'Asia/Kuala_Lumpur',
+  'kuwait':'Asia/Kuwait',
+  'kyiv':'Europe/Kyiv',
+  'la':'America/Los_Angeles',
+  'lagos':'Africa/Lagos',
+  'laos':'Asia/Vientiane',
+  'lima':'America/Lima',
+  'lisbon':'Europe/Lisbon',
+  'london':'Europe/London',
+  'losangeles':'America/Los_Angeles',
+  'macao':'Asia/Macau',
+  'macau':'Asia/Macau',
+  'madrid':'Europe/Madrid',
+  'malaysia':'Asia/Kuala_Lumpur',
+  'manila':'Asia/Manila',
+  'melbourne':'Australia/Melbourne',
+  'mexico':'America/Mexico_City',
+  'mexicocity':'America/Mexico_City',
+  'miami':'America/New_York',
+  'milan':'Europe/Rome',
+  'mongolia':'Asia/Ulaanbaatar',
+  'montreal':'America/Toronto',
+  'morocco':'Africa/Casablanca',
+  'moscow':'Europe/Moscow',
+  'mumbai':'Asia/Kolkata',
+  'munich':'Europe/Berlin',
+  'myanmar':'Asia/Yangon',
+  'nairobi':'Africa/Nairobi',
+  'nanjing':'Asia/Shanghai',
+  'nepal':'Asia/Kathmandu',
+  'netherlands':'Europe/Amsterdam',
+  'newdelhi':'Asia/Kolkata',
+  'newyork':'America/New_York',
+  'newzealand':'Pacific/Auckland',
+  'nigeria':'Africa/Lagos',
+  'norway':'Europe/Oslo',
+  'nyc':'America/New_York',
+  'osaka':'Asia/Tokyo',
+  'oslo':'Europe/Oslo',
+  'pakistan':'Asia/Karachi',
+  'paris':'Europe/Paris',
+  'perth':'Australia/Perth',
+  'peru':'America/Lima',
+  'philippines':'Asia/Manila',
+  'phoenix':'America/Phoenix',
+  'poland':'Europe/Warsaw',
+  'portugal':'Europe/Lisbon',
+  'prague':'Europe/Prague',
+  'pyongyang':'Asia/Pyongyang',
+  'qatar':'Asia/Qatar',
+  'rio':'America/Sao_Paulo',
+  'riodejaneiro':'America/Sao_Paulo',
+  'riyadh':'Asia/Riyadh',
+  'romania':'Europe/Bucharest',
+  'rome':'Europe/Rome',
+  'russia':['Europe/Moscow','Asia/Yekaterinburg','Asia/Novosibirsk','Asia/Krasnoyarsk','Asia/Irkutsk','Asia/Yakutsk','Asia/Vladivostok','Asia/Kamchatka'],
+  'saigon':'Asia/Ho_Chi_Minh',
+  'sandiego':'America/Los_Angeles',
+  'sanfrancisco':'America/Los_Angeles',
+  'santiago':'America/Santiago',
+  'saopaulo':'America/Sao_Paulo',
+  'saudiarabia':'Asia/Riyadh',
+  'seattle':'America/Los_Angeles',
+  'seoul':'Asia/Seoul',
+  'shanghai':'Asia/Shanghai',
+  'shenzhen':'Asia/Shanghai',
+  'siliconvalley':'America/Los_Angeles',
+  'singapore':'Asia/Singapore',
+  'southafrica':'Africa/Johannesburg',
+  'southkorea':'Asia/Seoul',
+  'spain':'Europe/Madrid',
+  'srilanka':'Asia/Colombo',
+  'stockholm':'Europe/Stockholm',
+  'sweden':'Europe/Stockholm',
+  'switzerland':'Europe/Zurich',
+  'sydney':'Australia/Sydney',
+  'taipei':'Asia/Taipei',
+  'taiwan':'Asia/Taipei',
+  'tehran':'Asia/Tehran',
+  'thailand':'Asia/Bangkok',
+  'tianjin':'Asia/Shanghai',
+  'tokyo':'Asia/Tokyo',
+  'toronto':'America/Toronto',
+  'turkey':'Europe/Istanbul',
+  'uae':'Asia/Dubai',
+  'uk':'Europe/London',
+  'ukraine':'Europe/Kyiv',
+  'unitedkingdom':'Europe/London',
+  'unitedstates':['America/New_York','America/Chicago','America/Denver','America/Phoenix','America/Los_Angeles','America/Anchorage'],
+  'universaltime':'UTC',
+  'urumqi':'Asia/Urumqi',
+  'us':['America/New_York','America/Chicago','America/Denver','America/Phoenix','America/Los_Angeles','America/Anchorage','Pacific/Honolulu'],
+  'usa':['America/New_York','America/Chicago','America/Denver','America/Phoenix','America/Los_Angeles','America/Anchorage','Pacific/Honolulu'],
+  'utc':'UTC',
+  'uzbekistan':'Asia/Tashkent',
+  'vancouver':'America/Vancouver',
+  'venezuela':'America/Caracas',
+  'vienna':'Europe/Vienna',
+  'vietnam':'Asia/Ho_Chi_Minh',
+  'warsaw':'Europe/Warsaw',
+  'washington':'America/New_York',
+  'wuhan':'Asia/Shanghai',
+  'xian':'Asia/Shanghai',
+  'yangon':'Asia/Yangon',
+  'zurich':'Europe/Zurich',
+  '上海':'Asia/Shanghai',
+  '世界时':'UTC',
+  '东京':'Asia/Tokyo',
+  '中国':['Asia/Shanghai','Asia/Urumqi'],
+  '丹佛':'America/Denver',
+  '丹麦':'Europe/Copenhagen',
+  '乌克兰':'Europe/Kyiv',
+  '乌兹别克斯坦':'Asia/Tashkent',
+  '乌鲁木齐':'Asia/Urumqi',
+  '亚特兰大':'America/New_York',
+  '以色列':'Asia/Jerusalem',
+  '伊拉克':'Asia/Baghdad',
+  '伊斯坦布尔':'Europe/Istanbul',
+  '伊朗':'Asia/Tehran',
+  '休斯敦':'America/Chicago',
+  '伦敦':'Europe/London',
+  '俄罗斯':['Europe/Moscow','Asia/Novosibirsk','Asia/Vladivostok'],
+  '保加利亚':'Europe/Sofia',
+  '冰岛':'Atlantic/Reykjavik',
+  '凤凰城':'America/Phoenix',
+  '加拿大':['America/Toronto','America/Vancouver','America/Edmonton','America/Winnipeg','America/Halifax'],
+  '匈牙利':'Europe/Budapest',
+  '北京':'Asia/Shanghai',
+  '华盛顿':'America/New_York',
+  '协调世界时':'UTC',
+  '南京':'Asia/Shanghai',
+  '南非':'Africa/Johannesburg',
+  '卡塔尔':'Asia/Qatar',
+  '卡拉奇':'Asia/Karachi',
+  '印尼':'Asia/Jakarta',
+  '印度':'Asia/Kolkata',
+  '印度尼西亚':'Asia/Jakarta',
+  '台北':'Asia/Taipei',
+  '台湾':'Asia/Taipei',
+  '吉隆坡':'Asia/Kuala_Lumpur',
+  '哈萨克斯坦':'Asia/Almaty',
+  '哥伦比亚':'America/Bogota',
+  '土耳其':'Europe/Istanbul',
+  '圣保罗':'America/Sao_Paulo',
+  '圣地亚哥':'America/Los_Angeles',
+  '埃及':'Africa/Cairo',
+  '埃塞俄比亚':'Africa/Addis_Ababa',
+  '基辅':'Europe/Kyiv',
+  '墨尔本':'Australia/Melbourne',
+  '墨西哥':'America/Mexico_City',
+  '墨西哥城':'America/Mexico_City',
+  '夏威夷':'Pacific/Honolulu',
+  '多伦多':'America/Toronto',
+  '大阪':'Asia/Tokyo',
+  '大陆':'Asia/Shanghai',
+  '天津':'Asia/Shanghai',
+  '奥克兰':'Pacific/Auckland',
+  '奥地利':'Europe/Vienna',
+  '委内瑞拉':'America/Caracas',
+  '孟买':'Asia/Kolkata',
+  '孟加拉':'Asia/Dhaka',
+  '尼日利亚':'Africa/Lagos',
+  '尼泊尔':'Asia/Kathmandu',
+  '巴厘岛':'Asia/Makassar',
+  '巴基斯坦':'Asia/Karachi',
+  '巴塞罗那':'Europe/Madrid',
+  '巴西':['America/Sao_Paulo','America/Manaus','America/Recife'],
+  '巴黎':'Europe/Paris',
+  '布宜诺斯艾利斯':'America/Argentina/Buenos_Aires',
+  '布拉格':'Europe/Prague',
+  '布里斯班':'Australia/Brisbane',
+  '希腊':'Europe/Athens',
+  '广州':'Asia/Shanghai',
+  '开罗':'Africa/Cairo',
+  '德国':'Europe/Berlin',
+  '德里':'Asia/Kolkata',
+  '悉尼':'Australia/Sydney',
+  '意大利':'Europe/Rome',
+  '慕尼黑':'Europe/Berlin',
+  '成都':'Asia/Shanghai',
+  '挪威':'Europe/Oslo',
+  '捷克':'Europe/Prague',
+  '摩洛哥':'Africa/Casablanca',
+  '斯里兰卡':'Asia/Colombo',
+  '新加坡':'Asia/Singapore',
+  '新西兰':'Pacific/Auckland',
+  '日本':'Asia/Tokyo',
+  '旧金山':'America/Los_Angeles',
+  '智利':'America/Santiago',
+  '曼谷':'Asia/Bangkok',
+  '朝鲜':'Asia/Pyongyang',
+  '杭州':'Asia/Shanghai',
+  '柏林':'Europe/Berlin',
+  '柬埔寨':'Asia/Phnom_Penh',
+  '格林威治':'UTC',
+  '武汉':'Asia/Shanghai',
+  '比利时':'Europe/Brussels',
+  '沙特':'Asia/Riyadh',
+  '河内':'Asia/Ho_Chi_Minh',
+  '法兰克福':'Europe/Berlin',
+  '法国':'Europe/Paris',
+  '波兰':'Europe/Warsaw',
+  '波士顿':'America/New_York',
+  '泰国':'Asia/Bangkok',
+  '洛杉矶':'America/Los_Angeles',
+  '深圳':'Asia/Shanghai',
+  '温哥华':'America/Vancouver',
+  '澳大利亚':['Australia/Sydney','Australia/Melbourne','Australia/Brisbane','Australia/Perth'],
+  '澳洲':['Australia/Sydney','Australia/Melbourne','Australia/Brisbane','Australia/Perth'],
+  '澳门':'Asia/Macau',
+  '爱尔兰':'Europe/Dublin',
+  '珀斯':'Australia/Perth',
+  '班加罗尔':'Asia/Kolkata',
+  '瑞典':'Europe/Stockholm',
+  '瑞士':'Europe/Zurich',
+  '白俄罗斯':'Europe/Minsk',
+  '硅谷':'America/Los_Angeles',
+  '科威特':'Asia/Kuwait',
+  '秘鲁':'America/Lima',
+  '米兰':'Europe/Rome',
+  '约翰内斯堡':'Africa/Johannesburg',
+  '纽约':'America/New_York',
+  '缅甸':'Asia/Yangon',
+  '罗马':'Europe/Rome',
+  '罗马尼亚':'Europe/Bucharest',
+  '美国':['America/New_York','America/Chicago','America/Denver','America/Phoenix','America/Los_Angeles','America/Anchorage','Pacific/Honolulu'],
+  '老挝':'Asia/Vientiane',
+  '肯尼亚':'Africa/Nairobi',
+  '胡志明':'Asia/Ho_Chi_Minh',
+  '芝加哥':'America/Chicago',
+  '芬兰':'Europe/Helsinki',
+  '英国':'Europe/London',
+  '荷兰':'Europe/Amsterdam',
+  '莫斯科':'Europe/Moscow',
+  '菲律宾':'Asia/Manila',
+  '葡萄牙':'Europe/Lisbon',
+  '蒙古':'Asia/Ulaanbaatar',
+  '蒙特利尔':'America/Toronto',
+  '西安':'Asia/Shanghai',
+  '西班牙':'Europe/Madrid',
+  '西雅图':'America/Los_Angeles',
+  '越南':'Asia/Ho_Chi_Minh',
+  '达拉斯':'America/Chicago',
+  '迈阿密':'America/New_York',
+  '迪拜':'Asia/Dubai',
+  '里约':'America/Sao_Paulo',
+  '重庆':'Asia/Shanghai',
+  '阿姆斯特丹':'Europe/Amsterdam',
+  '阿拉斯加':'America/Anchorage',
+  '阿根廷':'America/Argentina/Buenos_Aires',
+  '阿联酋':'Asia/Dubai',
+  '雅加达':'Asia/Jakarta',
+  '韩国':'Asia/Seoul',
+  '首尔':'Asia/Seoul',
+  '香港':'Asia/Hong_Kong',
+  '马尼拉':'Asia/Manila',
+  '马德里':'Europe/Madrid',
+  '马来西亚':'Asia/Kuala_Lumpur',
+  '서울':'Asia/Seoul',
   };
+
+  // Levenshtein distance capped at max+1: only used to forgive one or two
+  // typos in a short alias key ("japen", "germny"), never to match zone ids.
+  function editDistance(a,b,max){
+    if(Math.abs(a.length-b.length)>max)return max+1;
+    let prev=new Array(b.length+1);
+    let cur=new Array(b.length+1);
+    for(let j=0;j<=b.length;j++)prev[j]=j;
+    for(let i=1;i<=a.length;i++){
+      cur[0]=i;
+      let best=cur[0];
+      for(let j=1;j<=b.length;j++){
+        const cost=a[i-1]===b[j-1]?0:1;
+        cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+cost);
+        if(cur[j]<best)best=cur[j];
+      }
+      if(best>max)return max+1;
+      const swap=prev;prev=cur;cur=swap;
+    }
+    return prev[b.length];
+  }
+
+  // Long keys tolerate two edits, short ones only one, so "us" cannot drift
+  // into unrelated words while "australia" survives a doubled letter.
+  function typoBudget(key){
+    return key.length>=8?2:(key.length>=4?1:0);
+  }
+
+  // Resolve a query to alias targets, tolerating typos. An exact key always
+  // wins; otherwise the closest key within its own budget is used.
+  function aliasTargets(compactQuery){
+    if(!compactQuery)return null;
+    if(ALIASES[compactQuery])return ALIASES[compactQuery];
+    let best=null,bestDistance=Infinity;
+    for(const key in ALIASES){
+      const budget=typoBudget(key);
+      if(!budget||Math.abs(key.length-compactQuery.length)>budget)continue;
+      const distance=editDistance(compactQuery,key,budget);
+      if(distance<=budget&&distance<bestDistance){
+        bestDistance=distance;
+        best=ALIASES[key];
+      }
+    }
+    return best;
+  }
 
   function filterZones(query){
     const raw=query.trim();
@@ -399,10 +784,17 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
     // Subsequence matches are noisy, so only fall back to them when the stricter
     // passes found nothing ("shangai" still resolves, "utc" stays clean).
     if(!results.length)results=fuzzy.sort(byRank);
-    // City aliases are a fallback: only surface them when the id itself missed.
-    const alias=ALIASES[compactQuery];
-    if(alias&&zones.includes(alias)&&!results.some(item=>item.zone===alias)){
-      results.unshift({zone:alias,start:-1,end:-1,rank:5});
+    // Country/city aliases come first: they are what the user most likely meant,
+    // and a multi-zone country lists every zone it spans. A zone the id search
+    // already found is promoted rather than duplicated, otherwise a query like
+    // "america" (which every America/* id matches) would never reach New York.
+    const alias=aliasTargets(compactQuery);
+    if(alias){
+      const wanted=(Array.isArray(alias)?alias:[alias]).filter(zone=>zones.includes(zone));
+      if(wanted.length){
+        const promoted=wanted.map(zone=>({zone,start:-1,end:-1,rank:5}));
+        results=promoted.concat(results.filter(item=>!wanted.includes(item.zone)));
+      }
     }
     return results;
   }
@@ -443,12 +835,16 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
     const valueEl=root.querySelector('.combo-value');
     const search=root.querySelector('.combo-search');
     const list=root.querySelector('.combo-list');
+    const countEl=root.querySelector('.combo-count');
     const state={open:false,active:-1,items:[],value:''};
 
     function render(){
       const items=filterZones(search.value);
       state.items=items;
       list.replaceChildren();
+      countEl.textContent=search.value.trim()
+        ? '匹配 '+items.length+' / '+zones.length+' 个时区'
+        : '共 '+zones.length+' 个时区，可直接滚动选择';
       if(!items.length){
         state.active=-1;
         const empty=document.createElement('li');
@@ -457,10 +853,11 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
         list.appendChild(empty);
         return;
       }
-      const shown=items.slice(0,LIST_LIMIT);
-      if(state.active>=shown.length)state.active=shown.length-1;
+      // Every match is rendered: the whole zone list is ~550 rows, and the
+      // panel caches offsets, so a full open costs a single scrollable render.
+      if(state.active>=items.length)state.active=items.length-1;
       const fragment=document.createDocumentFragment();
-      shown.forEach((item,index)=>{
+      items.forEach((item,index)=>{
         const option=document.createElement('li');
         option.className='combo-opt'+(index===state.active?' active':'');
         option.setAttribute('role','option');
@@ -476,12 +873,6 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
         }
         fragment.appendChild(option);
       });
-      if(items.length>LIST_LIMIT){
-        const more=document.createElement('li');
-        more.className='combo-more';
-        more.textContent='共 '+items.length+' 项，继续输入以缩小范围';
-        fragment.appendChild(more);
-      }
       list.appendChild(fragment);
     }
 
@@ -521,7 +912,7 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
 
     function move(step){
       if(!state.items.length)return;
-      const total=Math.min(state.items.length,LIST_LIMIT);
+      const total=state.items.length;
       state.active=(state.active+step+total)%total;
       render();
       scrollActive();
