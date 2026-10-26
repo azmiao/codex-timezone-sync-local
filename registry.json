@@ -6,7 +6,7 @@
       "name": "Codex 离线时区同步",
       "description": "内置离线 IANA 时区表，在管理面板用两个下拉框选择本地与目标时区即可校正 Codex 请求中的日期与时区；无需宿主机辅助服务、状态文件或外网访问。",
       "author": "azmiao",
-      "version": "0.7.1",
+      "version": "0.7.2",
       "repository": "https://github.com/azmiao/codex-timezone-sync-local",
       "homepage": "https://github.com/azmiao/codex-timezone-sync-local",
       "license": "MIT",

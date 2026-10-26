@@ -13,7 +13,7 @@ permissions:
   contents: write
 
 env:
-  PLUGIN_VERSION: 0.7.1
+  PLUGIN_VERSION: 0.7.2
 
 jobs:
   build:
