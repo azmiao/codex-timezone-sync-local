@@ -321,6 +321,15 @@ static int candidate_dirs(char dirs[][PATH_BUF], int max) {
   if (plugin_library_dir(lib, sizeof(lib)) && count < max)
     snprintf(dirs[count++], PATH_BUF, "%s", lib);
 
+  // A host that loads plugins from a helper process started in scratch storage
+  // reports /tmp as its executable directory. The official container layout is
+  // then the only durable anchor left, so try it before per-user locations.
+  static const char *const container[] = {
+    "/CLIProxyAPI/plugins", "/CLIProxyAPI/data",
+  };
+  for (size_t i = 0; i < sizeof(container) / sizeof(container[0]) && count < max; i++)
+    snprintf(dirs[count++], PATH_BUF, "%s", container[i]);
+
   // Per-user fallback for a host that runs without a plugins volume.
   const char *config_home = plugin_getenv("XDG_CONFIG_HOME");
   if (config_home && *config_home && count < max)
