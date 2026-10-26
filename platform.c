@@ -1,9 +1,12 @@
 // Portability layer implementation. No third-party dependencies.
-// _POSIX_C_SOURCE / _DARWIN_C_SOURCE must be defined before any libc header so
-// that mkstemp, fchmod and friends are declared under -std=c11.
+// Feature macros must be defined before any libc header so that mkstemp and
+// friends are declared under -std=c11. dlfcn.h only exposes Dl_info and dladdr
+// when _GNU_SOURCE (or _DEFAULT_SOURCE) is also set, so _POSIX_C_SOURCE alone
+// is not enough on glibc.
 #ifdef __APPLE__
 #define _DARWIN_C_SOURCE 1
 #elif !defined(_WIN32)
+#define _GNU_SOURCE 1
 #define _POSIX_C_SOURCE 200809L
 #endif
 #include "platform.h"
