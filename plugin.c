@@ -18,7 +18,7 @@
 #include "dashboard_bundle.h"
 
 #define ABI_VERSION 1
-#define VERSION "0.7.0"
+#define VERSION "0.7.1"
 #define BODY_MAX (12u * 1024u * 1024u)
 #define TOKENS_MAX 4096
 #define ROUTE_PREFIX "/v0/management/plugins/codex-timezone-sync-local/"

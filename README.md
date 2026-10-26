@@ -2,7 +2,7 @@
 
 用于 [CLIProxyAPI（CPA）](https://github.com/router-for-me/CLIProxyAPI) 的 Codex 请求时区校正插件。内置离线 IANA 时区表，在管理面板选两个下拉框，即可把请求里的时区与日期改写为目标时区。
 
-**v0.7.0 · 插件 ID `codex-timezone-sync-local` · Linux / macOS / Windows（amd64 + arm64）· CPA C ABI v1**
+**v0.7.1 · 插件 ID `codex-timezone-sync-local` · Linux / macOS / Windows（amd64 + arm64）· CPA C ABI v1**
 
 ## 修改自原仓库
 
@@ -22,6 +22,10 @@
 原版的请求统计、模型一致性监控与失败请求日志归档未保留。
 
 > 原仓库未声明许可证；本仓库仅对自身改动以 [MIT](LICENSE) 授权。
+
+## v0.7.1 变更
+
+修复容器部署下「重启后设置回到默认值」的问题。旧版把配置固定写到 `/CLIProxyAPI/data`，该目录在多数 compose 部署里没有挂载，因此容器一重建文件就丢失。现在默认写到插件动态库所在目录，面板底部也会显示实际路径。
 
 ## 功能
 
@@ -99,4 +103,4 @@ make test-tz   # 时区表校验（需 pip install tzdata）
 uv run --with tzdata python tools/gen_tz_table.py
 ```
 
-发布流程在五个平台原生编译并跑测试，以 `v0.7.0` 这类 tag 发布 Release，附 `checksums.txt`。
+发布流程在五个平台原生编译并跑测试，以 `v0.7.1` 这类 tag 发布 Release，附 `checksums.txt`。
