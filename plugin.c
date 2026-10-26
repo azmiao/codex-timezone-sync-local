@@ -239,21 +239,27 @@ static void handle_status(plugin_buffer *out) {
   rewrite_context local, target;
   int local_ok = rewrite_context_build(cfg.local_zone, now, &local);
   int target_ok = rewrite_context_build(cfg.target_zone, now, &target);
-  char body[768];
+  char config_file[1200];
+  if (!settings_config_path(config_file, sizeof(config_file))) config_file[0] = '\0';
+  char *quoted_path = json_encode(config_file);
+  char body[2048];
   snprintf(body, sizeof(body),
            "{\"ok\":true,\"version\":\"%s\",\"settings\":{\"enabled\":%s,\"logging\":%s,"
            "\"local_zone\":\"%s\",\"target_zone\":\"%s\"},"
+           "\"config_file\":%s,"
            "\"local\":{\"zone\":\"%s\",\"date\":\"%s\",\"time\":\"%s\",\"abbreviation\":\"%s\",\"offset\":\"%s\"},"
            "\"target\":{\"zone\":\"%s\",\"date\":\"%s\",\"time\":\"%s\",\"abbreviation\":\"%s\",\"offset\":\"%s\"},"
            "\"timezones\":%d}",
            VERSION,
            cfg.enabled ? "true" : "false", cfg.logging ? "true" : "false",
            cfg.local_zone, cfg.target_zone,
+           quoted_path ? quoted_path : "\"\"",
            local_ok ? local.zone : "", local_ok ? local.date : "", local_ok ? local.time : "",
            local_ok ? local.abbr : "", local_ok ? local.offset : "",
            target_ok ? target.zone : "", target_ok ? target.date : "", target_ok ? target.time : "",
            target_ok ? target.abbr : "", target_ok ? target.offset : "",
            tz_count());
+  free(quoted_path);
   json_response(out, 200, body);
 }
 

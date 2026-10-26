@@ -13,6 +13,10 @@
 #include <string.h>
 #include <time.h>
 
+#ifndef _WIN32
+#include <dlfcn.h>
+#endif
+
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
@@ -107,3 +111,70 @@ int plugin_write_file_atomic(const char *path, const char *data, size_t length) 
 }
 
 #endif
+
+// ---------------------------------------------------------------------------
+// Settings path resolution
+// ---------------------------------------------------------------------------
+// The plugin has no API to learn where the host stores its data, so the only
+// reliable anchor is the library file itself: CPA discovers plugins from a
+// directory that operators mount as a volume. Writing next to the binary keeps
+// the file across container recreation without any extra configuration.
+
+// Strips the trailing path component, leaving the containing directory.
+static int dir_of(const char *path, char *out, size_t cap) {
+  if (!path || !*path || !out || cap < 2) return 0;
+  size_t length = strlen(path);
+  while (length > 0 && (path[length - 1] == '/' || path[length - 1] == '\\')) length--;
+  while (length > 0 && path[length - 1] != '/' && path[length - 1] != '\\') length--;
+  while (length > 1 && (path[length - 1] == '/' || path[length - 1] == '\\')) length--;
+  if (length == 0 || length >= cap) return 0;
+  memcpy(out, path, length);
+  out[length] = '\0';
+  return 1;
+}
+
+#ifdef _WIN32
+
+int plugin_library_dir(char *out, size_t cap) {
+  // GetModuleFileNameA inside a DLL reports the DLL path, not the host EXE.
+  HMODULE module = NULL;
+  if (!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                              GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                          (LPCSTR)(const void *)&plugin_library_dir, &module))
+    return 0;
+  char path[MAX_PATH];
+  DWORD length = GetModuleFileNameA(module, path, (DWORD)sizeof(path));
+  if (length == 0 || length >= sizeof(path)) return 0;
+  path[length] = '\0';
+  return dir_of(path, out, cap);
+}
+
+#else
+
+// Linux and macOS both resolve the library path through dladdr.
+int plugin_library_dir(char *out, size_t cap) {
+  Dl_info info;
+  if (!dladdr((const void *)&plugin_library_dir, &info) || !info.dli_fname) return 0;
+  return dir_of(info.dli_fname, out, cap);
+}
+
+#endif
+
+int plugin_config_path(char *out, size_t cap) {
+  const char *override = plugin_getenv("CODEX_TZ_CONFIG_FILE");
+  if (override && *override) {
+    if (strlen(override) >= cap) return 0;
+    snprintf(out, cap, "%s", override);
+    return 1;
+  }
+  char dir[1024];
+  if (!plugin_library_dir(dir, sizeof(dir))) {
+    if (strlen(PLUGIN_CONFIG_FALLBACK) >= cap) return 0;
+    snprintf(out, cap, "%s", PLUGIN_CONFIG_FALLBACK);
+    return 1;
+  }
+  // One separator plus the file name must still fit.
+  if (strlen(dir) + strlen(PLUGIN_CONFIG_NAME) + 2 > cap) return 0;
+  snprintf(out, cap, "%s/%s", dir, PLUGIN_CONFIG_NAME);
+  return 1;
+}

@@ -5,13 +5,21 @@
 
 #include <stddef.h>
 
-// Default data directory inside the CPA container; the env var overrides it.
-#define PLUGIN_DEFAULT_CONFIG "/CLIProxyAPI/data/codex-timezone-sync-local.config"
-#define PLUGIN_DEFAULT_EVENTS "/CLIProxyAPI/data/codex-timezone-sync-local.events"
+// Settings live next to the plugin binary, because that directory is the one
+// deployments actually mount as a volume. Hard-coding a container path such as
+// /CLIProxyAPI/data loses the file whenever the container is recreated.
+#define PLUGIN_CONFIG_NAME "codex-timezone-sync-local.config"
+// Used only when the library path cannot be resolved.
+#define PLUGIN_CONFIG_FALLBACK "/CLIProxyAPI/data/" PLUGIN_CONFIG_NAME
 
 // getenv that also sees the host process environment on Windows, where the
 // MinGW CRT keeps its own copy that the host (Go) never updates.
 const char *plugin_getenv(const char *name);
+// Resolves the settings file path: env override, else next to the library.
+// Returns 1 and fills out on success, 0 when no path could be produced.
+int plugin_config_path(char *out, size_t cap);
+// Directory holding the loaded library, or 0 when it cannot be resolved.
+int plugin_library_dir(char *out, size_t cap);
 // Current wall-clock time in Unix seconds.
 long long plugin_now(void);
 // Atomic, fsync'd, 0600 write through a temporary file in the same directory.

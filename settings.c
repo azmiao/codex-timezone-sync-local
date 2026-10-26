@@ -9,10 +9,15 @@
 
 #define CONFIG_LINE 160
 #define CONFIG_MAX 512
+#define CONFIG_PATH_MAX 1200
 
+// Resolves the settings file; falls back to the legacy location so an existing
+// file is still honoured when the library path cannot be resolved.
 static const char *config_path(void) {
-  const char *path = plugin_getenv("CODEX_TZ_CONFIG_FILE");
-  return path && *path ? path : PLUGIN_DEFAULT_CONFIG;
+  static char path[CONFIG_PATH_MAX];
+  if (plugin_config_path(path, sizeof(path))) return path;
+  snprintf(path, sizeof(path), "%s", PLUGIN_CONFIG_FALLBACK);
+  return path;
 }
 
 int settings_zone_valid(const char *zone) {
@@ -23,6 +28,12 @@ int settings_copy_zone(char *out, size_t cap, const char *value) {
   if (!out || !value || !*value || strlen(value) >= cap) return 0;
   if (!settings_zone_valid(value)) return 0;
   snprintf(out, cap, "%s", value);
+  return 1;
+}
+
+int settings_config_path(char *out, size_t cap) {
+  if (!out || cap < 2) return 0;
+  snprintf(out, cap, "%s", config_path());
   return 1;
 }
 

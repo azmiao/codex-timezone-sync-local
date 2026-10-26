@@ -11,10 +11,12 @@ else
 CFLAGS += -fPIC -fstack-protector-strong
 ifeq ($(shell uname -s),Darwin)
 LIB := codex-timezone-sync-local.dylib
+# dladdr lives in libSystem on macOS.
 LDFLAGS := -dynamiclib -pthread
 else
 LIB := codex-timezone-sync-local.so
-LDFLAGS := -pthread -shared
+# glibc 2.34+ ships dladdr in libc, but older toolchains still need libdl.
+LDFLAGS := -pthread -shared -ldl
 endif
 endif
 

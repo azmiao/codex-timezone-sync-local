@@ -159,6 +159,7 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
   </section>
 
   <footer id="updated">未连接管理接口</footer>
+  <footer id="config-file" style="margin-top:4px"></footer>
 </div>
 <script>
 'use strict';
@@ -251,6 +252,7 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
     $('target-time').textContent=status.target.time?`${status.target.date} ${status.target.time}`:'—';
     $('target-offset').textContent=status.target.offset?`${status.target.abbreviation} · UTC${status.target.offset}`:'—';
     $('updated').textContent=`插件 v${status.version} · 内置 ${status.timezones} 个时区 · 更新于 ${new Date().toLocaleString('zh-CN')}`;
+    $('config-file').textContent=status.config_file?`配置文件：${status.config_file}`:'';
   }
 
   const labels={rewritten:['ok','已改写'],unchanged:['warn','无需改写'],failed:['bad','失败']};

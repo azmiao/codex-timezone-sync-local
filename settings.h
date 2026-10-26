@@ -26,5 +26,7 @@ int settings_save(const tz_settings *cfg);
 int settings_zone_valid(const char *zone);
 // 1 when copied; rejects unknown zones and names that do not fit.
 int settings_copy_zone(char *out, size_t cap, const char *value);
+// Absolute path of the settings file actually in use, for diagnostics.
+int settings_config_path(char *out, size_t cap);
 
 #endif
