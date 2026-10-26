@@ -11,6 +11,7 @@
 #endif
 #include "platform.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,6 +21,11 @@
 #include <dlfcn.h>
 #endif
 
+// macOS resolves the host executable through _NSGetExecutablePath.
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
+
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
@@ -27,21 +33,21 @@
 
 // The host process is a Go binary linked against the UCRT, while the plugin may
 // use a different CRT; read the real process environment instead of the copy.
-static const char *windows_env(const char *name) {
-  static const char *names[] = {
-    "CODEX_TZ_CONFIG_FILE", "CODEX_TZ_EVENTS_FILE"
-  };
-  static char values[sizeof(names) / sizeof(names[0])][1024];
-  for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
-    if (strcmp(name, names[i]) != 0) continue;
-    DWORD length = GetEnvironmentVariableA(name, values[i], sizeof(values[i]));
-    return length > 0 && length < sizeof(values[i]) ? values[i] : NULL;
-  }
-  return NULL;
-}
-
+// Results rotate through a small pool so several variables can be read within
+// one expression without overwriting each other. Requests are handled
+// concurrently, so the pool cursor is guarded.
 const char *plugin_getenv(const char *name) {
-  return windows_env(name);
+  enum { SLOTS = 8, CAP = 1024 };
+  static char values[SLOTS][CAP];
+  static int next = 0;
+  static plugin_mutex_t mutex = PLUGIN_MUTEX_INITIALIZER;
+  if (!name || !*name) return NULL;
+  plugin_mutex_lock(&mutex);
+  char *slot = values[next];
+  next = (next + 1) % SLOTS;
+  DWORD length = GetEnvironmentVariableA(name, slot, CAP);
+  plugin_mutex_unlock(&mutex);
+  return length > 0 && length < CAP ? slot : NULL;
 }
 
 long long plugin_now(void) {
@@ -118,13 +124,18 @@ int plugin_write_file_atomic(const char *path, const char *data, size_t length) 
 // ---------------------------------------------------------------------------
 // Settings path resolution
 // ---------------------------------------------------------------------------
-// The plugin has no API to learn where the host stores its data, so the only
-// reliable anchor is the library file itself: CPA discovers plugins from a
-// directory that operators mount as a volume. Writing next to the binary keeps
-// the file across container recreation without any extra configuration.
+// The plugin has no API to learn where the host stores its data, and the two
+// obvious anchors both fail. CPA copies every plugin into a per-process scratch
+// directory (/tmp/cliproxy-pluginhost/pid-N/) before loading it, so the library
+// path points at storage that is wiped on restart — that was the original bug.
+// The host executable is the reliable anchor instead: CPA keeps its plugins in
+// <executable dir>/plugins, which operators mount as a volume, so a file written
+// there survives container recreation.
+
+#define PATH_BUF 1200
 
 // Strips the trailing path component, leaving the containing directory.
-static int dir_of(const char *path, char *out, size_t cap) {
+int plugin_dir_of(const char *path, char *out, size_t cap) {
   if (!path || !*path || !out || cap < 2) return 0;
   size_t length = strlen(path);
   while (length > 0 && (path[length - 1] == '/' || path[length - 1] == '\\')) length--;
@@ -136,7 +147,71 @@ static int dir_of(const char *path, char *out, size_t cap) {
   return 1;
 }
 
+// Joins a directory and a name, rejecting anything that would not fit.
+static int join_path(const char *dir, const char *name, char *out, size_t cap) {
+  if (!dir || !name || !out) return 0;
+  if (strlen(dir) + strlen(name) + 2 > cap) return 0;
+  snprintf(out, cap, "%s/%s", dir, name);
+  return 1;
+}
+
+static int has_prefix(const char *text, const char *prefix) {
+  return strncmp(text, prefix, strlen(prefix)) == 0;
+}
+
+int plugin_path_is_volatile(const char *path) {
+  if (!path || !*path) return 1;
+  // The host's scratch copies and the usual tmpfs mounts. A file written here
+  // appears to work and then vanishes on the next start. Prefixes carry the
+  // trailing separator so a directory such as /tmpdata is not caught.
+  static const char *const scratch[] = {
+    // /var/folders is the macOS per-user temp root.
+    "/tmp/", "/var/tmp/", "/var/folders/", "/dev/shm/", "/run/user/",
+  };
+  for (size_t i = 0; i < sizeof(scratch) / sizeof(scratch[0]); i++)
+    if (has_prefix(path, scratch[i])) return 1;
+  // The mount points themselves.
+  static const char *const roots[] = {"/tmp", "/var/tmp", "/dev/shm"};
+  for (size_t i = 0; i < sizeof(roots) / sizeof(roots[0]); i++)
+    if (strcmp(path, roots[i]) == 0) return 1;
 #ifdef _WIN32
+  // Windows temp storage plays the same role for the copied DLL.
+  const char *temp = plugin_getenv("TEMP");
+  if (temp && *temp) {
+    size_t length = strlen(temp);
+    if (_strnicmp(path, temp, length) == 0 && (path[length] == '\\' || path[length] == '/'))
+      return 1;
+  }
+#endif
+  return 0;
+}
+
+#ifdef _WIN32
+
+static int file_exists(const char *path) {
+  DWORD attributes = GetFileAttributesA(path);
+  return attributes != INVALID_FILE_ATTRIBUTES &&
+         (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+}
+
+int plugin_dir_writable(const char *dir) {
+  // The probe name carries the process id so concurrent instances never
+  // collide; FILE_FLAG_DELETE_ON_CLOSE removes it when the handle closes.
+  char name[64];
+  snprintf(name, sizeof(name), ".codex-tz-probe-%lu", (unsigned long)GetCurrentProcessId());
+  char probe[PATH_BUF];
+  if (!join_path(dir, name, probe, sizeof(probe))) return 0;
+  HANDLE handle = CreateFileA(probe, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+                              FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, NULL);
+  if (handle == INVALID_HANDLE_VALUE) return 0;
+  CloseHandle(handle);
+  return 1;
+}
+
+int plugin_dir_exists(const char *dir) {
+  DWORD attributes = GetFileAttributesA(dir);
+  return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+}
 
 int plugin_library_dir(char *out, size_t cap) {
   // GetModuleFileNameA inside a DLL reports the DLL path, not the host EXE.
@@ -149,35 +224,169 @@ int plugin_library_dir(char *out, size_t cap) {
   DWORD length = GetModuleFileNameA(module, path, (DWORD)sizeof(path));
   if (length == 0 || length >= sizeof(path)) return 0;
   path[length] = '\0';
-  return dir_of(path, out, cap);
+  return plugin_dir_of(path, out, cap);
+}
+
+int plugin_executable_dir(char *out, size_t cap) {
+  char path[MAX_PATH];
+  DWORD length = GetModuleFileNameA(NULL, path, (DWORD)sizeof(path));
+  if (length == 0 || length >= sizeof(path)) return 0;
+  path[length] = '\0';
+  return plugin_dir_of(path, out, cap);
 }
 
 #else
 
-// Linux and macOS both resolve the library path through dladdr.
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+static int file_exists(const char *path) {
+  struct stat info;
+  return stat(path, &info) == 0 && S_ISREG(info.st_mode);
+}
+
+int plugin_dir_writable(const char *dir) {
+  // The probe name carries the process id so concurrent instances never
+  // collide, and it is removed immediately either way.
+  char name[64];
+  snprintf(name, sizeof(name), ".codex-tz-probe-%ld", (long)getpid());
+  char probe[PATH_BUF];
+  if (!join_path(dir, name, probe, sizeof(probe))) return 0;
+  int fd = open(probe, O_CREAT | O_WRONLY | O_TRUNC, 0600);
+  if (fd < 0) return 0;
+  close(fd);
+  unlink(probe);
+  return 1;
+}
+
+int plugin_dir_exists(const char *dir) {
+  struct stat info;
+  return stat(dir, &info) == 0 && S_ISDIR(info.st_mode);
+}
+
+// Linux and macOS both resolve the library path through dladdr, which reports
+// the host's temporary copy rather than the installed location.
 int plugin_library_dir(char *out, size_t cap) {
   Dl_info info;
   if (!dladdr((const void *)&plugin_library_dir, &info) || !info.dli_fname) return 0;
-  return dir_of(info.dli_fname, out, cap);
+  return plugin_dir_of(info.dli_fname, out, cap);
+}
+
+int plugin_executable_dir(char *out, size_t cap) {
+#if defined(__APPLE__)
+  char raw[PATH_BUF * 2];
+  uint32_t size = (uint32_t)sizeof(raw);
+  if (_NSGetExecutablePath(raw, &size) != 0) return 0;
+  char real[PATH_BUF * 2];
+  // The reported path may contain symlinks; resolve when possible.
+  if (!realpath(raw, real)) snprintf(real, sizeof(real), "%s", raw);
+  return plugin_dir_of(real, out, cap);
+#else
+  char raw[PATH_BUF];
+  ssize_t length = readlink("/proc/self/exe", raw, sizeof(raw) - 1);
+  if (length <= 0) return 0;
+  raw[length] = '\0';
+  return plugin_dir_of(raw, out, cap);
+#endif
 }
 
 #endif
 
+// Candidate directories, most durable first. The environment overrides are
+// handled by the caller before this runs.
+static int candidate_dirs(char dirs[][PATH_BUF], int max) {
+  int count = 0;
+  char exe[PATH_BUF];
+  if (plugin_executable_dir(exe, sizeof(exe))) {
+    // <exe dir>/plugins is where CPA installs plugins and the one directory
+    // deployments mount as a volume.
+    if (count < max && join_path(exe, PLUGIN_DIR_NAME, dirs[count], PATH_BUF)) count++;
+    // The host data directory, in case plugins live elsewhere.
+    if (count < max && join_path(exe, "data", dirs[count], PATH_BUF)) count++;
+  }
+
+  // The library directory only helps when the host loads the plugin in place;
+  // its scratch copy is rejected by the volatility check below.
+  char lib[PATH_BUF];
+  if (plugin_library_dir(lib, sizeof(lib)) && count < max)
+    snprintf(dirs[count++], PATH_BUF, "%s", lib);
+
+  // Per-user fallback for a host that runs without a plugins volume.
+  const char *config_home = plugin_getenv("XDG_CONFIG_HOME");
+  if (config_home && *config_home && count < max)
+    snprintf(dirs[count++], PATH_BUF, "%s", config_home);
+  const char *home = plugin_getenv("HOME");
+  if (home && *home && count < max && join_path(home, ".config", dirs[count], PATH_BUF))
+    count++;
+  return count;
+}
+
+// Only existing directories are considered: creating one at a guessed path
+// would scatter empty folders through the host's install tree.
+static int usable_dir(const char *dir) {
+  return !plugin_path_is_volatile(dir) && plugin_dir_exists(dir);
+}
+
+// Joins a directory and the config name, checking that the result fits.
+static int config_in(const char *dir, char *out, size_t cap) {
+  if (!join_path(dir, PLUGIN_CONFIG_NAME, out, cap)) return 0;
+  return strlen(out) < cap;
+}
+
+// Last resort: keep settings working for this process even though they will not
+// survive a restart. The library directory always exists, and the panel warns
+// when the resolved path is volatile.
+static void fallback_path(char *out, size_t cap) {
+  char lib[PATH_BUF];
+  if (plugin_library_dir(lib, sizeof(lib)) && config_in(lib, out, cap)) return;
+  snprintf(out, cap, "%s", PLUGIN_CONFIG_FALLBACK);
+}
+
+// Scans the candidate list once and caches the winner. Probing each directory
+// costs several syscalls, and settings_load runs on every intercepted request.
+static int cached_dir_path(char *out, size_t cap) {
+  static char cached[PATH_BUF];
+  static plugin_mutex_t mutex = PLUGIN_MUTEX_INITIALIZER;
+  if (cached[0]) {
+    if (strlen(cached) >= cap) return 0;
+    snprintf(out, cap, "%s", cached);
+    return 1;
+  }
+  plugin_mutex_lock(&mutex);
+  if (!cached[0]) {
+    char dirs[8][PATH_BUF];
+    int count = candidate_dirs(dirs, 8);
+    // An existing file takes precedence: moving it on upgrade would look
+    // exactly like the settings loss this function exists to prevent.
+    for (int pass = 0; pass < 2 && !cached[0]; pass++) {
+      for (int i = 0; i < count && !cached[0]; i++) {
+        if (!usable_dir(dirs[i])) continue;
+        char path[PATH_BUF];
+        if (!config_in(dirs[i], path, sizeof(path))) continue;
+        int accept = pass == 0 ? file_exists(path) : plugin_dir_writable(dirs[i]);
+        if (accept) snprintf(cached, sizeof(cached), "%s", path);
+      }
+    }
+    if (!cached[0]) fallback_path(cached, sizeof(cached));
+  }
+  plugin_mutex_unlock(&mutex);
+  if (strlen(cached) >= cap) return 0;
+  snprintf(out, cap, "%s", cached);
+  return 1;
+}
+
 int plugin_config_path(char *out, size_t cap) {
+  // Both overrides are re-read on every call: an operator (or a test) may set
+  // them after the plugin already resolved a path once.
   const char *override = plugin_getenv("CODEX_TZ_CONFIG_FILE");
   if (override && *override) {
     if (strlen(override) >= cap) return 0;
     snprintf(out, cap, "%s", override);
     return 1;
   }
-  char dir[1024];
-  if (!plugin_library_dir(dir, sizeof(dir))) {
-    if (strlen(PLUGIN_CONFIG_FALLBACK) >= cap) return 0;
-    snprintf(out, cap, "%s", PLUGIN_CONFIG_FALLBACK);
-    return 1;
-  }
-  // One separator plus the file name must still fit.
-  if (strlen(dir) + strlen(PLUGIN_CONFIG_NAME) + 2 > cap) return 0;
-  snprintf(out, cap, "%s/%s", dir, PLUGIN_CONFIG_NAME);
-  return 1;
+  const char *dir = plugin_getenv("CODEX_TZ_CONFIG_DIR");
+  if (dir && *dir && plugin_dir_exists(dir) && plugin_dir_writable(dir))
+    return config_in(dir, out, cap);
+  return cached_dir_path(out, cap);
 }

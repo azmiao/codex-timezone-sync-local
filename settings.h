@@ -28,5 +28,7 @@ int settings_zone_valid(const char *zone);
 int settings_copy_zone(char *out, size_t cap, const char *value);
 // Absolute path of the settings file actually in use, for diagnostics.
 int settings_config_path(char *out, size_t cap);
+// 1 when the settings directory accepts writes, so a save will persist.
+int settings_config_writable(void);
 
 #endif

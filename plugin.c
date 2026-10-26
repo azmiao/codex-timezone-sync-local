@@ -242,11 +242,12 @@ static void handle_status(plugin_buffer *out) {
   char config_file[1200];
   if (!settings_config_path(config_file, sizeof(config_file))) config_file[0] = '\0';
   char *quoted_path = json_encode(config_file);
-  char body[2048];
+  // Sized for the worst case: a long escaped path plus both timezone readouts.
+  char body[4096];
   snprintf(body, sizeof(body),
            "{\"ok\":true,\"version\":\"%s\",\"settings\":{\"enabled\":%s,\"logging\":%s,"
            "\"local_zone\":\"%s\",\"target_zone\":\"%s\"},"
-           "\"config_file\":%s,"
+           "\"config_file\":%s,\"config_writable\":%s,"
            "\"local\":{\"zone\":\"%s\",\"date\":\"%s\",\"time\":\"%s\",\"abbreviation\":\"%s\",\"offset\":\"%s\"},"
            "\"target\":{\"zone\":\"%s\",\"date\":\"%s\",\"time\":\"%s\",\"abbreviation\":\"%s\",\"offset\":\"%s\"},"
            "\"timezones\":%d}",
@@ -254,6 +255,7 @@ static void handle_status(plugin_buffer *out) {
            cfg.enabled ? "true" : "false", cfg.logging ? "true" : "false",
            cfg.local_zone, cfg.target_zone,
            quoted_path ? quoted_path : "\"\"",
+           settings_config_writable() ? "true" : "false",
            local_ok ? local.zone : "", local_ok ? local.date : "", local_ok ? local.time : "",
            local_ok ? local.abbr : "", local_ok ? local.offset : "",
            target_ok ? target.zone : "", target_ok ? target.date : "", target_ok ? target.time : "",

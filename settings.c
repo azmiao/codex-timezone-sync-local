@@ -11,13 +11,14 @@
 #define CONFIG_MAX 512
 #define CONFIG_PATH_MAX 1200
 
-// Resolves the settings file; falls back to the legacy location so an existing
-// file is still honoured when the library path cannot be resolved.
-static const char *config_path(void) {
-  static char path[CONFIG_PATH_MAX];
-  if (plugin_config_path(path, sizeof(path))) return path;
-  snprintf(path, sizeof(path), "%s", PLUGIN_CONFIG_FALLBACK);
-  return path;
+// plugin_config_path caches the resolved directory itself, so this stays cheap
+// even though settings_load runs on every intercepted request. The result is
+// not cached here: the environment overrides must be re-read on each call, so
+// an operator change still reaches the right file. The caller supplies the
+// buffer because requests are handled concurrently.
+static void config_path(char *out, size_t cap) {
+  if (!plugin_config_path(out, cap))
+    snprintf(out, cap, "%s", PLUGIN_CONFIG_FALLBACK);
 }
 
 int settings_zone_valid(const char *zone) {
@@ -33,8 +34,18 @@ int settings_copy_zone(char *out, size_t cap, const char *value) {
 
 int settings_config_path(char *out, size_t cap) {
   if (!out || cap < 2) return 0;
-  snprintf(out, cap, "%s", config_path());
+  config_path(out, cap);
   return 1;
+}
+
+// Reported by the panel so a read-only plugins directory is visible instead of
+// only showing up as lost settings after the next restart.
+int settings_config_writable(void) {
+  char path[CONFIG_PATH_MAX];
+  config_path(path, sizeof(path));
+  char dir[CONFIG_PATH_MAX];
+  if (!plugin_dir_of(path, dir, sizeof(dir))) return 0;
+  return plugin_dir_writable(dir);
 }
 
 // Match "key=value" and hand back the value; NULL when the key differs.
@@ -44,14 +55,50 @@ static const char *value_of(const char *line, const char *key) {
   return line + length + 1;
 }
 
+// Earlier builds wrote next to the loaded library. Because the host loads
+// plugins from a scratch copy, that path is /tmp/cliproxy-pluginhost/pid-N/.
+// On the first run after the upgrade, adopt such a file so a user's settings
+// survive the switch instead of silently reverting to defaults.
+static void adopt_legacy_file(const char *target) {
+  // Runs at most once per process: settings_load is on the request hot path.
+  static int attempted = 0;
+  static plugin_mutex_t mutex = PLUGIN_MUTEX_INITIALIZER;
+  plugin_mutex_lock(&mutex);
+  int first = !attempted;
+  attempted = 1;
+  plugin_mutex_unlock(&mutex);
+  if (!first) return;
+  char legacy[CONFIG_PATH_MAX];
+  if (!plugin_library_dir(legacy, sizeof(legacy))) return;
+  char legacy_path[CONFIG_PATH_MAX];
+  if (strlen(legacy) + strlen(PLUGIN_CONFIG_NAME) + 2 > sizeof(legacy_path)) return;
+  snprintf(legacy_path, sizeof(legacy_path), "%s/%s", legacy, PLUGIN_CONFIG_NAME);
+  if (strcmp(legacy_path, target) == 0) return;
+  FILE *source = fopen(legacy_path, "r");
+  if (!source) return;
+  char data[CONFIG_MAX];
+  size_t length = fread(data, 1, sizeof(data), source);
+  int readable = !ferror(source);
+  fclose(source);
+  if (!readable || length == 0) return;
+  if (plugin_write_file_atomic(target, data, length)) remove(legacy_path);
+}
+
 void settings_load(tz_settings *out) {
   memset(out, 0, sizeof(*out));
   out->enabled = 1;
   out->logging = 1;
   snprintf(out->local_zone, sizeof(out->local_zone), "%s", TZ_DEFAULT_LOCAL);
   snprintf(out->target_zone, sizeof(out->target_zone), "%s", TZ_DEFAULT_TARGET);
-  FILE *file = fopen(config_path(), "r");
-  if (!file) return;
+  char path[CONFIG_PATH_MAX];
+  config_path(path, sizeof(path));
+  FILE *file = fopen(path, "r");
+  if (!file) {
+    // No file at the new location: migrate one left by an older build.
+    adopt_legacy_file(path);
+    file = fopen(path, "r");
+    if (!file) return;
+  }
   char line[CONFIG_LINE];
   while (fgets(line, sizeof(line), file)) {
     line[strcspn(line, "\r\n")] = 0;
@@ -73,7 +120,8 @@ void settings_load(tz_settings *out) {
 int settings_save(const tz_settings *cfg) {
   if (!cfg || !settings_zone_valid(cfg->local_zone) || !settings_zone_valid(cfg->target_zone))
     return 0;
-  const char *path = config_path();
+  char path[CONFIG_PATH_MAX];
+  config_path(path, sizeof(path));
   if (strlen(path) > 1024) return 0;
   char data[CONFIG_MAX];
   int length = snprintf(data, sizeof(data),
