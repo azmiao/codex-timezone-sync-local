@@ -149,9 +149,17 @@ int plugin_dir_of(const char *path, char *out, size_t cap) {
 
 // Joins a directory and a name, rejecting anything that would not fit.
 static int join_path(const char *dir, const char *name, char *out, size_t cap) {
-  if (!dir || !name || !out) return 0;
-  if (strlen(dir) + strlen(name) + 2 > cap) return 0;
-  snprintf(out, cap, "%s/%s", dir, name);
+  if (!dir || !name || !out || cap < 2) return 0;
+  size_t dir_length = strlen(dir);
+  size_t name_length = strlen(name);
+  // One separator, the name, and the terminator must all fit.
+  if (dir_length + 1 + name_length + 1 > cap) return 0;
+  // Assembled by hand: snprintf cannot prove the bound above to the compiler,
+  // which trips -Werror=format-truncation on some targets.
+  memcpy(out, dir, dir_length);
+  out[dir_length] = '/';
+  memcpy(out + dir_length + 1, name, name_length);
+  out[dir_length + 1 + name_length] = '\0';
   return 1;
 }
 

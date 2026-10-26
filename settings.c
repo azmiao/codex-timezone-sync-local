@@ -70,9 +70,13 @@ static void adopt_legacy_file(const char *target) {
   if (!first) return;
   char legacy[CONFIG_PATH_MAX];
   if (!plugin_library_dir(legacy, sizeof(legacy))) return;
+  size_t dir_length = strlen(legacy);
+  size_t name_length = strlen(PLUGIN_CONFIG_NAME);
+  if (dir_length + 1 + name_length + 1 > CONFIG_PATH_MAX) return;
   char legacy_path[CONFIG_PATH_MAX];
-  if (strlen(legacy) + strlen(PLUGIN_CONFIG_NAME) + 2 > sizeof(legacy_path)) return;
-  snprintf(legacy_path, sizeof(legacy_path), "%s/%s", legacy, PLUGIN_CONFIG_NAME);
+  memcpy(legacy_path, legacy, dir_length);
+  legacy_path[dir_length] = '/';
+  memcpy(legacy_path + dir_length + 1, PLUGIN_CONFIG_NAME, name_length + 1);
   if (strcmp(legacy_path, target) == 0) return;
   FILE *source = fopen(legacy_path, "r");
   if (!source) return;
