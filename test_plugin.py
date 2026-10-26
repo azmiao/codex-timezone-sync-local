@@ -128,7 +128,7 @@ class TestRegistration(PluginTestCase):
         self.assertTrue(result['capabilities']['request_interceptor'])
         self.assertTrue(result['capabilities']['management_api'])
         self.assertEqual(result['metadata']['Name'], 'Codex 离线时区同步')
-        self.assertEqual(result['metadata']['Version'], '0.7.1')
+        self.assertEqual(result['metadata']['Version'], '0.7.2')
         # The store registry and the release workflow carry the same version.
         self.assertEqual(json.loads((ROOT / 'registry.json').read_text(encoding='utf-8'))
                          ['plugins'][0]['version'], result['metadata']['Version'])
