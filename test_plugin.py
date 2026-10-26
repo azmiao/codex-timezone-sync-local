@@ -164,13 +164,24 @@ class TestRegistration(PluginTestCase):
         self.assertEqual(result['Headers']['Content-Type'], ['text/html; charset=utf-8'])
         html = base64.b64decode(result['Body']).decode('utf-8')
         self.assertIn('Codex 离线时区同步', html)
-        self.assertIn('<select id="local-zone"', html)
-        self.assertIn('<select id="target-zone"', html)
+        self.assertIn('id="local-zone"', html)
+        self.assertIn('id="target-zone"', html)
         # No external asset may be required: the panel must work offline.
         self.assertNotIn('http://', html)
         self.assertNotIn('https://', html)
         self.assertNotIn('<script src=', html)
         self.assertNotIn('<link rel="stylesheet"', html)
+
+    def test_zone_pickers_are_searchable(self):
+        html = base64.b64decode(call('management.handle', {'Method': 'GET', 'Path': PANEL})['result']['Body']).decode('utf-8')
+        # The pickers are custom comboboxes so 597 zones stay searchable.
+        self.assertEqual(html.count('role="combobox"'), 2)
+        self.assertEqual(html.count('class="combo-search"'), 2)
+        self.assertIn('function filterZones', html)
+        self.assertIn('function isSubsequence', html)
+        # Common city names resolve even though they are absent from IANA ids.
+        self.assertIn('ALIASES', html)
+        self.assertIn("'beijing':'Asia/Shanghai'", html)
 
     def test_panel_follows_host_theme(self):
         html = base64.b64decode(call('management.handle', {'Method': 'GET', 'Path': PANEL})['result']['Body']).decode('utf-8')
@@ -186,6 +197,19 @@ class TestRegistration(PluginTestCase):
         self.assertIn('cli-proxy-theme', html)
         self.assertIn('prefers-color-scheme: dark', html)
         self.assertIn('MutationObserver', html)
+
+    def test_light_palette_matches_the_host_management_center(self):
+        # The panel used to be warm-gold on a dark canvas, which clashed with the
+        # host. It now reuses the Management Center's neutral paper tokens.
+        html = base64.b64decode(call('management.handle', {'Method': 'GET', 'Path': PANEL})['result']['Body']).decode('utf-8')
+        for token in ('--bg:#faf9f5', '--line:#e3e1db', '--text:#2d2a26', '--accent:#8b8680'):
+            self.assertIn(token, html)
+        # The old gold accent must be gone.
+        self.assertNotIn('#edb858', html)
+        self.assertNotIn('#f6c864', html)
+        # The host also offers a pure-white variant, which the panel mirrors.
+        self.assertIn('html[data-theme=white]', html)
+        self.assertIn("if(host==='white')return 'white'", html)
 
     def test_unknown_route_is_404(self):
         result = call('management.handle', {'Method': 'GET', 'Path': '/v0/unknown'})['result']
