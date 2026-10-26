@@ -157,7 +157,8 @@ static int join_path(const char *dir, const char *name, char *out, size_t cap) {
   // Assembled by hand: snprintf cannot prove the bound above to the compiler,
   // which trips -Werror=format-truncation on some targets.
   memcpy(out, dir, dir_length);
-  out[dir_length] = '/';
+  // Windows callers (and Python's pathlib) expect the native separator.
+  out[dir_length] = PLUGIN_PATH_SEPARATOR;
   memcpy(out + dir_length + 1, name, name_length);
   out[dir_length + 1 + name_length] = '\0';
   return 1;

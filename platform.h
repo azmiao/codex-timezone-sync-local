@@ -16,6 +16,13 @@
 #define PLUGIN_DIR_NAME "plugins"
 // Used only when no writable candidate directory could be found.
 #define PLUGIN_CONFIG_FALLBACK "/CLIProxyAPI/data/" PLUGIN_CONFIG_NAME
+// Windows accepts either separator, but pathlib and other tools compare
+// against the native one, so paths are built with it.
+#ifdef _WIN32
+#define PLUGIN_PATH_SEPARATOR '\\'
+#else
+#define PLUGIN_PATH_SEPARATOR '/'
+#endif
 
 // getenv that also sees the host process environment on Windows, where the
 // MinGW CRT keeps its own copy that the host (Go) never updates.

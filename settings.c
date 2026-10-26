@@ -75,7 +75,7 @@ static void adopt_legacy_file(const char *target) {
   if (dir_length + 1 + name_length + 1 > CONFIG_PATH_MAX) return;
   char legacy_path[CONFIG_PATH_MAX];
   memcpy(legacy_path, legacy, dir_length);
-  legacy_path[dir_length] = '/';
+  legacy_path[dir_length] = PLUGIN_PATH_SEPARATOR;
   memcpy(legacy_path + dir_length + 1, PLUGIN_CONFIG_NAME, name_length + 1);
   if (strcmp(legacy_path, target) == 0) return;
   FILE *source = fopen(legacy_path, "r");
