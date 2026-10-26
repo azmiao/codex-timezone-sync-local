@@ -174,7 +174,7 @@ class TestRegistration(PluginTestCase):
 
     def test_zone_pickers_are_searchable(self):
         html = base64.b64decode(call('management.handle', {'Method': 'GET', 'Path': PANEL})['result']['Body']).decode('utf-8')
-        # The pickers are custom comboboxes so 597 zones stay searchable.
+        # The pickers are custom comboboxes so ~550 zones stay searchable.
         self.assertEqual(html.count('role="combobox"'), 2)
         self.assertEqual(html.count('class="combo-search"'), 2)
         self.assertIn('function filterZones', html)
@@ -182,6 +182,32 @@ class TestRegistration(PluginTestCase):
         # Common city names resolve even though they are absent from IANA ids.
         self.assertIn('ALIASES', html)
         self.assertIn("'beijing':'Asia/Shanghai'", html)
+
+    def test_zone_picker_lists_every_zone_by_default(self):
+        # Opening a picker must not truncate: the panel renders the whole list
+        # and lets the user scroll, instead of hiding rows behind a cap.
+        html = base64.b64decode(call('management.handle', {'Method': 'GET', 'Path': PANEL})['result']['Body']).decode('utf-8')
+        self.assertNotIn('LIST_LIMIT', html)
+        self.assertNotIn('继续输入以缩小范围', html)
+        self.assertIn("if(!raw)return zones.map(zone=>({zone,start:-1,end:-1}))", html)
+        self.assertIn('combo-count', html)
+
+    def test_zone_picker_matches_countries_and_typos(self):
+        html = base64.b64decode(call('management.handle', {'Method': 'GET', 'Path': PANEL})['result']['Body']).decode('utf-8')
+        # Country names never appear in an IANA id, so they need an alias table.
+        self.assertIn("'japan':'Asia/Tokyo'", html)
+        self.assertIn("'日本':'Asia/Tokyo'", html)
+        # Countries spanning several zones must list all of them, not just one.
+        self.assertIn("'usa':[", html)
+        self.assertIn('America/New_York', html)
+        self.assertIn('Pacific/Honolulu', html)
+        # One or two typos still resolve ("japen", "germny").
+        self.assertIn('function editDistance', html)
+        self.assertIn('function typoBudget', html)
+        self.assertIn('function aliasTargets', html)
+        # An alias hit is promoted, not merely appended, so a query whose zone
+        # ids all match the term still surfaces the intended zone first.
+        self.assertIn('promoted.concat(', html)
 
     def test_panel_follows_host_theme(self):
         html = base64.b64decode(call('management.handle', {'Method': 'GET', 'Path': PANEL})['result']['Body']).decode('utf-8')
@@ -209,16 +235,21 @@ class TestRegistration(PluginTestCase):
 
     def test_light_palette_matches_the_host_management_center(self):
         # The panel used to be warm-gold on a dark canvas, which clashed with the
-        # host. It now reuses the Management Center's neutral paper tokens.
+        # host. It now reuses the Management Center's neutral tokens, with the
+        # pure-white variant as the default because that is what the host's
+        # "auto" theme resolves to on a light system.
         html = base64.b64decode(call('management.handle', {'Method': 'GET', 'Path': PANEL})['result']['Body']).decode('utf-8')
-        for token in ('--bg:#faf9f5', '--line:#e3e1db', '--text:#2d2a26', '--accent:#8b8680'):
+        self.assertIn('--bg:#ffffff', html)
+        for token in ('--line:#e5e5e5', '--text:#2d2a26', '--accent:#8b8680'):
             self.assertIn(token, html)
         # The old gold accent must be gone.
         self.assertNotIn('#edb858', html)
         self.assertNotIn('#f6c864', html)
-        # The host also offers a pure-white variant, which the panel mirrors.
-        self.assertIn('html[data-theme=white]', html)
+        # The host's warm paper variant stays available behind its own attribute.
+        self.assertIn('html[data-theme=light]', html)
+        self.assertIn('--bg:#faf9f5', html)
         self.assertIn("if(host==='white')return 'white'", html)
+        self.assertIn("if(host==='light')return 'light'", html)
 
     def test_unknown_route_is_404(self):
         result = call('management.handle', {'Method': 'GET', 'Path': '/v0/unknown'})['result']
