@@ -282,17 +282,36 @@ class TestTimezones(PluginTestCase):
         code, body = self.management('status')
         self.assertEqual(code, 200)
         self.assertEqual(body['config_file'], str(self.config))
+        self.assertTrue(body['config_writable'])
 
-    def test_config_path_follows_the_library_by_default(self):
-        # Without the env override the settings file must sit next to the
-        # library, because that directory is the one mounted as a volume.
+    def test_config_path_never_lands_in_scratch_storage(self):
+        # The host copies each plugin into a per-process scratch directory before
+        # loading it, so resolving "next to the library" wrote settings into
+        # /tmp and every restart reverted them to defaults. The resolved path
+        # must therefore avoid tmpfs even though that is where the library is.
         os.environ.pop('CODEX_TZ_CONFIG_FILE', None)
         code, body = self.management('status')
         self.assertEqual(code, 200)
         resolved = pathlib.Path(body['config_file'])
         self.assertEqual(resolved.name, 'codex-timezone-sync-local.config')
-        self.assertEqual(resolved.parent.resolve(), ROOT.resolve())
         self.assertNotIn('/CLIProxyAPI/data/', body['config_file'])
+        volatile = ('/tmp/', '/var/tmp/', '/dev/shm/')
+        self.assertFalse(body['config_file'].startswith(volatile), body['config_file'])
+        self.assertTrue(resolved.parent.is_dir(), body['config_file'])
+
+    def test_config_dir_override_wins(self):
+        # CODEX_TZ_CONFIG_DIR gives operators an explicit escape hatch when the
+        # plugins volume is read-only or lives somewhere unusual.
+        os.environ.pop('CODEX_TZ_CONFIG_FILE', None)
+        with tempfile.TemporaryDirectory() as target:
+            os.environ['CODEX_TZ_CONFIG_DIR'] = target
+            try:
+                code, body = self.management('status')
+            finally:
+                os.environ.pop('CODEX_TZ_CONFIG_DIR', None)
+            self.assertEqual(code, 200)
+            self.assertEqual(body['config_file'],
+                             str(pathlib.Path(target) / 'codex-timezone-sync-local.config'))
 
 
 class TestSettings(PluginTestCase):
