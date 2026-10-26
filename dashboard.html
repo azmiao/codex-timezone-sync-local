@@ -6,14 +6,49 @@
 <meta name="color-scheme" content="light dark">
 <title>Codex 离线时区同步</title>
 <style>
-:root{color-scheme:light;--bg:#f4f2ed;--glow:#fff;--card:#fff;--card-2:#faf8f4;--line:#ded7c9;--line-soft:#e7e1d6;--sub:#6d675e;--text:#211d18;--head:#eae5da;--surface:#fff;--sunken:#f7f5f0;--accent:#9a6b12;--accent-soft:#c8952e;--accent-line:#e0c489;--accent-ink:#2a1c05;--green:#17794a;--green-line:#9fd0b5;--green-bg:#e8f6ee;--amber:#8a5f10;--amber-line:#e0c489;--amber-bg:#fbf2dd;--red:#a83728;--red-line:#e8b3a9;--red-bg:#fbeceb;--muted:#8b847a;--track:#cfc9bd;--track-line:#b3ab9c;--knob:#fff;--shadow:#1f1c1712}
-html[data-theme=dark]{color-scheme:dark;--bg:#121110;--glow:#211f1b;--card:#1b1a18;--card-2:#201e1b;--line:#4a4235;--line-soft:#35322e;--sub:#a9a49c;--text:#f1f0ee;--head:#282521;--surface:#141310;--sunken:#100f0e;--accent:#edb858;--accent-soft:#f6c864;--accent-line:#eec06c;--accent-ink:#201408;--green:#43d98b;--green-line:#2f6b4b;--green-bg:#152a20;--amber:#edb858;--amber-line:#6b5a2f;--amber-bg:#2a2415;--red:#f58b79;--red-line:#6b3a2f;--red-bg:#2a1715;--muted:#7d766c;--track:#4a4a4a;--track-line:#6d6d6d;--knob:#fbfbfb;--shadow:#0006}
+/* Palette mirrors the CPA Management Center tokens so the panel reads as part
+   of the host instead of an embedded third-party page. */
+:root{
+  color-scheme:light;
+  --bg:#faf9f5;--surface:#ffffff;--card:#ffffff;--card-2:#faf9f5;--sunken:#f6f4ee;--head:#f0eee8;
+  --line:#e3e1db;--line-soft:#eae7e1;--line-hover:#cecac4;
+  --text:#2d2a26;--sub:#6d6760;--muted:#a29c95;
+  --accent:#8b8680;--accent-hover:#7f7a74;--accent-ink:#ffffff;--accent-ring:rgba(139,134,128,.24);
+  --green:#0f9d76;--green-line:#6ee7b7;--green-bg:#d1fae5;
+  --amber:#92400e;--amber-line:#e8cfa0;--amber-bg:#fdf3e3;
+  --red:#c65746;--red-line:rgba(198,87,70,.35);--red-bg:rgba(198,87,70,.12);
+  --track:#d5d2cb;--track-line:#cecac4;--knob:#ffffff;
+  --shadow:0 1px 2px rgb(0 0 0 / .08);--shadow-pop:0 12px 26px rgb(0 0 0 / .14);
+}
+html[data-theme=white]{
+  color-scheme:light;
+  --bg:#ffffff;--surface:#ffffff;--card:#ffffff;--card-2:#ffffff;--sunken:#fafafa;--head:#f6f6f6;
+  --line:#e5e5e5;--line-soft:#eeeeee;--line-hover:#cccccc;
+  --text:#2d2a26;--sub:#6d6760;--muted:#a29c95;
+  --accent:#8b8680;--accent-hover:#7f7a74;--accent-ink:#ffffff;--accent-ring:rgba(139,134,128,.24);
+  --green:#0f9d76;--green-line:#6ee7b7;--green-bg:#d1fae5;
+  --amber:#92400e;--amber-line:#e8cfa0;--amber-bg:#fdf3e3;
+  --red:#c65746;--red-line:rgba(198,87,70,.35);--red-bg:rgba(198,87,70,.12);
+  --track:#d9d9d9;--track-line:#cccccc;--knob:#ffffff;
+  --shadow:0 1px 2px rgb(0 0 0 / .08);--shadow-pop:0 12px 26px rgb(0 0 0 / .12);
+}
+html[data-theme=dark]{color-scheme:dark;
+  --bg:#151412;--surface:#1d1b18;--card:#1d1b18;--card-2:#191714;--sunken:#141311;--head:#262320;
+  --line:#3a3530;--line-soft:#302c28;--line-hover:#5a544d;
+  --text:#f6f4f1;--sub:#c9c3bb;--muted:#9c958d;
+  --accent:#8b8680;--accent-hover:#9a948e;--accent-ink:#ffffff;--accent-ring:rgba(139,134,128,.32);
+  --green:#6ee7b7;--green-line:#059669;--green-bg:rgba(6,78,59,.3);
+  --amber:#e0aa14;--amber-line:rgba(224,170,20,.4);--amber-bg:rgba(224,170,20,.14);
+  --red:#f1b0a6;--red-line:rgba(198,87,70,.5);--red-bg:rgba(198,87,70,.24);
+  --track:#3a3530;--track-line:#4a453f;--knob:#f6f4f1;
+  --shadow:0 1px 3px rgb(0 0 0 / .3);--shadow-pop:0 14px 30px rgb(0 0 0 / .4);
+}
 *{box-sizing:border-box}
-body{margin:0;background:radial-gradient(ellipse at 50% 0%,var(--glow) 0%,var(--bg) 62%);font:15px/1.55 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--text);min-height:100vh}
-button,select,input{font:inherit}
+body{margin:0;background:var(--bg);font:15px/1.55 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--text);min-height:100vh}
+button,input{font:inherit}
 button{cursor:pointer}
-button:disabled,select:disabled,input:disabled{opacity:.5;cursor:not-allowed}
-button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:disabled,input:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible,input:focus-visible,[role=combobox]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .app{max-width:1080px;margin:0 auto;padding:28px 24px 40px}
 header{display:flex;align-items:center;gap:16px;margin-bottom:22px}
 .symbol{width:56px;height:56px;flex:none;color:var(--accent)}
@@ -21,34 +56,61 @@ svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-l
 .symbol .dial{fill:var(--bg)}
 h1{font-size:24px;margin:0;font-weight:700}
 .subtitle{color:var(--sub);font-size:14px}
-.auth{display:flex;flex-wrap:wrap;gap:10px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:16px;background:var(--card-2)}
+.auth{display:flex;flex-wrap:wrap;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:16px;background:var(--card)}
 .auth label{font-weight:600;white-space:nowrap}
 .auth input{flex:1;min-width:140px;max-width:340px;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px 12px}
+.auth input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-ring)}
 .auth .helper{color:var(--sub);font-size:13px;flex:1;min-width:100%}
 .auth .connected{color:var(--green)}
-.panel{border:1px solid var(--line);background:linear-gradient(150deg,var(--card),var(--card-2));border-radius:13px;padding:20px 22px;margin-bottom:16px;box-shadow:0 1px 2px var(--shadow)}
+.panel{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:20px 22px;margin-bottom:16px;box-shadow:var(--shadow)}
 .panel h2{font-size:16px;margin:0 0 14px;font-weight:700;color:var(--text)}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.card{border:1px solid var(--line-soft);border-radius:11px;padding:16px;background:var(--card-2)}
-.card strong{display:block;font-size:13px;color:var(--sub);margin-bottom:8px;font-weight:600;letter-spacing:.4px}
-select{width:100%;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
-select:disabled{background:var(--card)}
+.card{border:1px solid var(--line-soft);border-radius:10px;padding:16px;background:var(--card-2)}
+.card strong{display:block;font-size:13px;color:var(--sub);margin-bottom:8px;font-weight:600;letter-spacing:.3px}
+
+/* Searchable timezone picker */
+.combo{position:relative}
+.combo-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:42px;padding:9px 12px;text-align:left;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:8px;transition:border-color .15s,box-shadow .15s}
+.combo-trigger:hover:not(:disabled){border-color:var(--line-hover)}
+.combo.open .combo-trigger{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-ring)}
+.combo.is-disabled .combo-trigger{cursor:not-allowed}
+.combo-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+.combo-value.placeholder{color:var(--muted)}
+.caret{flex:none;width:16px;height:16px;color:var(--sub);transition:transform .15s}
+.combo.open .caret{transform:rotate(180deg)}
+.combo-pop{position:absolute;z-index:40;top:calc(100% + 6px);left:0;right:0;display:none;padding:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-pop)}
+.combo.open .combo-pop{display:block}
+.combo-search{width:100%;padding:8px 10px;margin-bottom:6px;color:var(--text);background:var(--sunken);border:1px solid var(--line);border-radius:7px}
+.combo-search:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-ring)}
+.combo-list{max-height:264px;margin:0;padding:0;overflow:auto;list-style:none;overscroll-behavior:contain}
+.combo-opt{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 10px;border-radius:6px;font-size:14px;cursor:pointer}
+.combo-opt:hover{background:var(--head)}
+.combo-opt.active{background:var(--head)}
+.combo-opt[aria-selected=true]{font-weight:600}
+.combo-opt[aria-selected=true]::after{content:"✓";margin-left:auto;color:var(--accent);font-size:12px}
+.combo-opt[aria-selected=true] .combo-off{margin-left:8px}
+.combo-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.combo-name mark{background:transparent;color:var(--accent);font-weight:700}
+.combo-off{flex:none;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.combo-empty,.combo-more{padding:12px 10px;color:var(--sub);font-size:13px;text-align:center}
+.combo-more{color:var(--muted);font-size:12px}
+
 .readout{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin-top:12px;font-size:13px}
 .readout span{color:var(--sub)}
 .readout b{font-weight:600;font-variant-numeric:tabular-nums}
 .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
 .toggle{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
 .toggle input{position:absolute;opacity:0;width:0;height:0}
-.track{width:46px;height:26px;border-radius:14px;background:var(--track);border:1px solid var(--track-line);position:relative;transition:background .15s;flex:none}
-.track::after{content:"";position:absolute;width:20px;height:20px;margin:2px;border-radius:50%;background:var(--knob);transition:transform .15s;box-shadow:0 1px 3px var(--shadow)}
-.toggle input:checked+.track{background:linear-gradient(100deg,var(--accent-soft),var(--accent));border-color:var(--accent-line)}
+.track{width:44px;height:24px;border-radius:12px;background:var(--track);border:1px solid var(--track-line);position:relative;transition:background .15s;flex:none}
+.track::after{content:"";position:absolute;width:18px;height:18px;margin:2px;border-radius:50%;background:var(--knob);transition:transform .15s;box-shadow:0 1px 3px rgb(0 0 0 / .25)}
+.toggle input:checked+.track{background:var(--accent);border-color:var(--accent)}
 .toggle input:checked+.track::after{transform:translateX(20px)}
 .toggle input:disabled+.track{opacity:.5}
-button.action{background:linear-gradient(110deg,var(--accent-soft),var(--accent));color:var(--accent-ink);border:1px solid var(--accent-line);border-radius:9px;padding:10px 18px;font-weight:700}
-button.action:hover{filter:brightness(1.07)}
-button.ghost{background:transparent;border:1px solid var(--line);color:var(--text);border-radius:9px;padding:9px 16px;font-weight:600}
-button.ghost:hover{border-color:var(--accent);color:var(--accent)}
-.feedback{margin-top:12px;min-height:22px;font-size:13px;color:var(--accent)}
+button.action{background:var(--accent);color:var(--accent-ink);border:1px solid var(--accent);border-radius:8px;padding:9px 18px;font-weight:600}
+button.action:hover:not(:disabled){background:var(--accent-hover);border-color:var(--accent-hover)}
+button.ghost{background:transparent;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 16px;font-weight:600}
+button.ghost:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.feedback{margin-top:12px;min-height:22px;font-size:13px;color:var(--sub)}
 .feedback.error{color:var(--red)}
 .table{width:100%;border-collapse:collapse;font-size:13px}
 .table th{text-align:left;font-weight:600;color:var(--sub);background:var(--head);padding:9px 12px;white-space:nowrap}
@@ -72,14 +134,15 @@ window.__tzTheme=function(){
     if(window.parent!==window){
       var host=window.parent.document.documentElement.getAttribute('data-theme');
       if(host==='dark')return 'dark';
-      if(host==='white')return 'light';
+      if(host==='white')return 'white';
+      if(host==='light')return 'light';
     }
   }catch(e){}
   try{
     var saved=JSON.parse(localStorage.getItem('cli-proxy-theme')||'null');
     var theme=saved&&saved.state?saved.state.theme:'';
     if(theme==='dark')return 'dark';
-    if(theme==='white')return 'light';
+    if(theme==='white')return 'white';
   }catch(e){}
   return window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
 };
@@ -113,7 +176,16 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
     <div class="grid">
       <div class="card">
         <strong>本地时区（请求中的原时区）</strong>
-        <select id="local-zone" aria-label="本地时区"></select>
+        <div class="combo is-disabled" id="local-zone" role="combobox" aria-expanded="false" aria-haspopup="listbox" aria-label="本地时区">
+          <button type="button" class="combo-trigger" disabled>
+            <span class="combo-value placeholder">未选择</span>
+            <svg class="caret" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
+          </button>
+          <div class="combo-pop">
+            <input class="combo-search" type="text" placeholder="搜索时区，如 shanghai、tokyo、new york" autocomplete="off" spellcheck="false">
+            <ul class="combo-list" role="listbox" aria-label="时区候选"></ul>
+          </div>
+        </div>
         <div class="readout">
           <span>当前时间</span><b id="local-time">—</b>
           <span>偏移</span><b id="local-offset">—</b>
@@ -121,7 +193,16 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
       </div>
       <div class="card">
         <strong>目标时区（写入请求的时区）</strong>
-        <select id="target-zone" aria-label="目标时区"></select>
+        <div class="combo is-disabled" id="target-zone" role="combobox" aria-expanded="false" aria-haspopup="listbox" aria-label="目标时区">
+          <button type="button" class="combo-trigger" disabled>
+            <span class="combo-value placeholder">未选择</span>
+            <svg class="caret" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
+          </button>
+          <div class="combo-pop">
+            <input class="combo-search" type="text" placeholder="搜索时区，如 shanghai、tokyo、new york" autocomplete="off" spellcheck="false">
+            <ul class="combo-list" role="listbox" aria-label="时区候选"></ul>
+          </div>
+        </div>
         <div class="readout">
           <span>当前时间</span><b id="target-time">—</b>
           <span>偏移</span><b id="target-offset">—</b>
@@ -166,9 +247,12 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
 (() => {
   const base='/v0/management/plugins/codex-timezone-sync-local/';
   const $=id=>document.getElementById(id);
+  const LIST_LIMIT=60;
   let key='';
   let zones=[];
   let status=null;
+  const offsets=new Map();
+  const combos=[];
 
   function applyTheme(){
     document.documentElement.setAttribute('data-theme',window.__tzTheme());
@@ -225,28 +309,271 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
     return response.json();
   }
 
-  function zoneOptions(select,selected){
-    if(!select.options.length){
-      const fragment=document.createDocumentFragment();
-      for(const zone of zones){
-        const option=document.createElement('option');
-        option.value=zone;
-        option.textContent=zone;
-        fragment.appendChild(option);
-      }
-      select.appendChild(fragment);
-    }
-    if(selected&&zones.includes(selected))select.value=selected;
+  // ---------------------------------------------------------------------------
+  // Fuzzy zone matching
+  // ---------------------------------------------------------------------------
+  // Substring wins over subsequence so "shanghai" ranks Asia/Shanghai first,
+  // while "newyork" still finds America/New_York with the separators removed.
+  function compact(text){
+    return text.toLowerCase().replace(/[\s_\-/]+/g,'');
   }
+
+  function isSubsequence(needle,haystack){
+    let index=0;
+    for(let i=0;i<haystack.length&&index<needle.length;i++){
+      if(haystack[i]===needle[index])index++;
+    }
+    return index===needle.length;
+  }
+
+  // Common city names that do not appear in the IANA id, so typing "beijing"
+  // still reaches Asia/Shanghai instead of returning nothing.
+  const ALIASES={
+    'beijing':'Asia/Shanghai','shanghai':'Asia/Shanghai','guangzhou':'Asia/Shanghai',
+    'shenzhen':'Asia/Shanghai','chengdu':'Asia/Shanghai','chongqing':'Asia/Shanghai',
+    'hangzhou':'Asia/Shanghai','wuhan':"Asia/Shanghai",'xian':'Asia/Shanghai',
+    'hongkong':'Asia/Hong_Kong','hong kong':'Asia/Hong_Kong','macau':'Asia/Macau',
+    'taipei':'Asia/Taipei','tokyo':'Asia/Tokyo','osaka':'Asia/Tokyo',
+    'seoul':'Asia/Seoul','singapore':'Asia/Singapore','bangkok':'Asia/Bangkok',
+    'mumbai':'Asia/Kolkata','delhi':'Asia/Kolkata','kolkata':'Asia/Kolkata',
+    'dubai':'Asia/Dubai','jakarta':'Asia/Jakarta','manila':'Asia/Manila',
+    'hanoi':'Asia/Ho_Chi_Minh','saigon':'Asia/Ho_Chi_Minh','kualalumpur':'Asia/Kuala_Lumpur',
+    'sydney':'Australia/Sydney','melbourne':'Australia/Melbourne',
+    'perth':'Australia/Perth','auckland':'Pacific/Auckland',
+    'london':'Europe/London','paris':'Europe/Paris','berlin':'Europe/Berlin',
+    'madrid':'Europe/Madrid','rome':'Europe/Rome','amsterdam':'Europe/Amsterdam',
+    'zurich':'Europe/Zurich','vienna':'Europe/Vienna','stockholm':'Europe/Stockholm',
+    'oslo':'Europe/Oslo','helsinki':'Europe/Helsinki','dublin':'Europe/Dublin',
+    'lisbon':'Europe/Lisbon','warsaw':'Europe/Warsaw','prague':'Europe/Prague',
+    'athens':'Europe/Athens','istanbul':'Europe/Istanbul','moscow':'Europe/Moscow',
+    'kiev':'Europe/Kyiv','kyiv':'Europe/Kyiv',
+    'newyork':'America/New_York','boston':'America/New_York','washington':'America/New_York',
+    'miami':'America/New_York','atlanta':'America/New_York','toronto':'America/Toronto',
+    'chicago':'America/Chicago','dallas':'America/Chicago','houston':'America/Chicago',
+    'denver':'America/Denver','phoenix':'America/Phoenix',
+    'losangeles':'America/Los_Angeles','sanfrancisco':'America/Los_Angeles',
+    'seattle':'America/Los_Angeles','sandiego':'America/Los_Angeles',
+    'vancouver':'America/Vancouver','mexico':'America/Mexico_City',
+    'saopaulo':'America/Sao_Paulo','buenosaires':'America/Argentina/Buenos_Aires',
+    'lima':'America/Lima','bogota':'America/Bogota','santiago':'America/Santiago',
+    'cairo':'Africa/Cairo','lagos':'Africa/Lagos','nairobi':'Africa/Nairobi',
+    'johannesburg':'Africa/Johannesburg','casablanca':'Africa/Casablanca',
+  };
+
+  function filterZones(query){
+    const raw=query.trim();
+    if(!raw)return zones.map(zone=>({zone,start:-1,end:-1}));
+    const lower=raw.toLowerCase();
+    const compactQuery=compact(raw);
+    const exact=[];
+    const compacted=[];
+    const fuzzy=[];
+    for(const zone of zones){
+      const zoneLower=zone.toLowerCase();
+      const at=zoneLower.indexOf(lower);
+      if(at>=0){
+        // A whole-name hit beats a prefix hit, which beats a mid-string hit.
+        const whole=zoneLower===lower?4:(at===0?3:2);
+        exact.push({zone,start:at,end:at+lower.length,rank:whole});
+        continue;
+      }
+      if(compactQuery){
+        const zoneCompact=compact(zone);
+        if(zoneCompact.includes(compactQuery)){
+          compacted.push({zone,start:-1,end:-1,rank:1});
+          continue;
+        }
+        if(isSubsequence(compactQuery,zoneCompact))fuzzy.push({zone,start:-1,end:-1,rank:0});
+      }
+    }
+    // Rank desc, then shorter names first so "UTC" outranks "Etc/UTC".
+    const byRank=(a,b)=>b.rank-a.rank||a.zone.length-b.zone.length||a.zone.localeCompare(b.zone);
+    let results=exact.sort(byRank).concat(compacted.sort(byRank));
+    // Subsequence matches are noisy, so only fall back to them when the stricter
+    // passes found nothing ("shangai" still resolves, "utc" stays clean).
+    if(!results.length)results=fuzzy.sort(byRank);
+    // City aliases are a fallback: only surface them when the id itself missed.
+    const alias=ALIASES[compactQuery];
+    if(alias&&zones.includes(alias)&&!results.some(item=>item.zone===alias)){
+      results.unshift({zone:alias,start:-1,end:-1,rank:5});
+    }
+    return results;
+  }
+
+  function zoneOffset(zone){
+    if(offsets.has(zone))return offsets.get(zone);
+    let text='';
+    try{
+      const parts=new Intl.DateTimeFormat('en-US',{timeZone:zone,timeZoneName:'shortOffset'})
+        .formatToParts(new Date());
+      const found=parts.find(part=>part.type==='timeZoneName');
+      if(found)text=found.value==='GMT'?'UTC':found.value.replace(/^GMT/,'UTC');
+    }catch(error){text='';}
+    offsets.set(zone,text);
+    return text;
+  }
+
+  function zoneLabel(item){
+    const span=document.createElement('span');
+    span.className='combo-name';
+    if(item.start>=0&&item.end>item.start){
+      span.appendChild(document.createTextNode(item.zone.slice(0,item.start)));
+      const mark=document.createElement('mark');
+      mark.textContent=item.zone.slice(item.start,item.end);
+      span.appendChild(mark);
+      span.appendChild(document.createTextNode(item.zone.slice(item.end)));
+    } else {
+      span.textContent=item.zone;
+    }
+    return span;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Searchable combobox
+  // ---------------------------------------------------------------------------
+  function setupCombo(root){
+    const trigger=root.querySelector('.combo-trigger');
+    const valueEl=root.querySelector('.combo-value');
+    const search=root.querySelector('.combo-search');
+    const list=root.querySelector('.combo-list');
+    const state={open:false,active:-1,items:[],value:''};
+
+    function render(){
+      const items=filterZones(search.value);
+      state.items=items;
+      list.replaceChildren();
+      if(!items.length){
+        state.active=-1;
+        const empty=document.createElement('li');
+        empty.className='combo-empty';
+        empty.textContent='没有匹配的时区';
+        list.appendChild(empty);
+        return;
+      }
+      const shown=items.slice(0,LIST_LIMIT);
+      if(state.active>=shown.length)state.active=shown.length-1;
+      const fragment=document.createDocumentFragment();
+      shown.forEach((item,index)=>{
+        const option=document.createElement('li');
+        option.className='combo-opt'+(index===state.active?' active':'');
+        option.setAttribute('role','option');
+        option.setAttribute('aria-selected',item.zone===state.value?'true':'false');
+        option.dataset.zone=item.zone;
+        option.appendChild(zoneLabel(item));
+        const offset=zoneOffset(item.zone);
+        if(offset){
+          const chip=document.createElement('span');
+          chip.className='combo-off';
+          chip.textContent=offset;
+          option.appendChild(chip);
+        }
+        fragment.appendChild(option);
+      });
+      if(items.length>LIST_LIMIT){
+        const more=document.createElement('li');
+        more.className='combo-more';
+        more.textContent='共 '+items.length+' 项，继续输入以缩小范围';
+        fragment.appendChild(more);
+      }
+      list.appendChild(fragment);
+    }
+
+    function scrollActive(){
+      const active=list.querySelector('.combo-opt.active');
+      if(active)active.scrollIntoView({block:'nearest'});
+    }
+
+    function open(){
+      if(trigger.disabled)return;
+      for(const other of combos)if(other!==combo)other.close();
+      state.open=true;
+      root.classList.add('open');
+      root.setAttribute('aria-expanded','true');
+      search.value='';
+      state.active=-1;
+      render();
+      search.focus();
+      const selected=list.querySelector('[aria-selected="true"]');
+      if(selected)selected.scrollIntoView({block:'nearest'});
+    }
+
+    function close(){
+      state.open=false;
+      root.classList.remove('open');
+      root.setAttribute('aria-expanded','false');
+    }
+
+    function pick(zone){
+      if(!zone)return;
+      state.value=zone;
+      valueEl.textContent=zone;
+      valueEl.classList.remove('placeholder');
+      close();
+      trigger.focus();
+    }
+
+    function move(step){
+      if(!state.items.length)return;
+      const total=Math.min(state.items.length,LIST_LIMIT);
+      state.active=(state.active+step+total)%total;
+      render();
+      scrollActive();
+    }
+
+    trigger.addEventListener('click',()=>state.open?close():open());
+    search.addEventListener('input',()=>{state.active=0;render();});
+    search.addEventListener('keydown',event=>{
+      if(event.key==='ArrowDown'){event.preventDefault();move(1);}
+      else if(event.key==='ArrowUp'){event.preventDefault();move(-1);}
+      else if(event.key==='Enter'){
+        event.preventDefault();
+        const item=state.items[state.active]||state.items[0];
+        if(item)pick(item.zone);
+      }
+      else if(event.key==='Escape'){event.preventDefault();close();trigger.focus();}
+      else if(event.key==='Tab')close();
+    });
+    list.addEventListener('click',event=>{
+      const option=event.target.closest('.combo-opt');
+      if(option)pick(option.dataset.zone);
+    });
+    document.addEventListener('click',event=>{
+      if(!root.contains(event.target))close();
+    });
+
+    const combo={
+      root,
+      open,
+      close,
+      set(zone){
+        state.value=zone||'';
+        valueEl.textContent=state.value||'未选择';
+        valueEl.classList.toggle('placeholder',!state.value);
+      },
+      get(){return state.value;},
+      enable(flag){
+        trigger.disabled=!flag;
+        root.classList.toggle('is-disabled',!flag);
+        if(!flag)close();
+      }
+    };
+    combos.push(combo);
+    return combo;
+  }
+
+  const comboLocal=setupCombo($('local-zone'));
+  const comboZone=setupCombo($('target-zone'));
 
   function renderStatus(){
     if(!status)return;
     const settings=status.settings;
-    zoneOptions($('local-zone'),settings.local_zone);
-    zoneOptions($('target-zone'),settings.target_zone);
+    comboLocal.set(settings.local_zone);
+    comboZone.set(settings.target_zone);
     $('toggle-sync').checked=!!settings.enabled;
     $('toggle-log').checked=!!settings.logging;
-    for(const id of ['local-zone','target-zone','toggle-sync','toggle-log'])$(id).disabled=false;
+    comboLocal.enable(true);
+    comboZone.enable(true);
+    for(const id of ['toggle-sync','toggle-log'])$(id).disabled=false;
     $('local-time').textContent=status.local.time?`${status.local.date} ${status.local.time}`:'—';
     $('local-offset').textContent=status.local.offset?`${status.local.abbreviation} · UTC${status.local.offset}`:'—';
     $('target-time').textContent=status.target.time?`${status.target.date} ${status.target.time}`:'—';
@@ -335,11 +662,14 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
   });
 
   $('save').addEventListener('click',()=>guarded(async()=>{
+    const localZone=comboLocal.get();
+    const targetZone=comboZone.get();
+    if(!localZone||!targetZone)throw new Error('请先选择本地时区与目标时区');
     await api('settings','PUT',{
       enabled:$('toggle-sync').checked,
       logging:$('toggle-log').checked,
-      local_zone:$('local-zone').value,
-      target_zone:$('target-zone').value,
+      local_zone:localZone,
+      target_zone:targetZone,
     });
     await refresh();
     feedback('设置已保存，下一次 Codex 请求立即生效。');
