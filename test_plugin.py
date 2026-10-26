@@ -198,6 +198,15 @@ class TestRegistration(PluginTestCase):
         self.assertIn('prefers-color-scheme: dark', html)
         self.assertIn('MutationObserver', html)
 
+    def test_theme_observer_cannot_feed_itself(self):
+        # Opened standalone, window.parent is this same document, so observing the
+        # parent would let applyTheme() react to its own writes forever and wedge
+        # the main thread (blank panel). The observer must be gated on framing,
+        # and the write must be idempotent.
+        html = base64.b64decode(call('management.handle', {'Method': 'GET', 'Path': PANEL})['result']['Body']).decode('utf-8')
+        self.assertIn('if(window.parent===window)return;', html)
+        self.assertIn("if(document.documentElement.getAttribute('data-theme')!==next)", html)
+
     def test_light_palette_matches_the_host_management_center(self):
         # The panel used to be warm-gold on a dark canvas, which clashed with the
         # host. It now reuses the Management Center's neutral paper tokens.
