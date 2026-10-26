@@ -212,6 +212,24 @@ class TestTimezones(PluginTestCase):
         self.assertTrue(body['target']['offset'].startswith(('+', '-')))
         self.assertGreater(body['timezones'], 400)
 
+    def test_status_reports_the_config_file_in_use(self):
+        # Restarts appeared to drop settings because the file landed in a
+        # directory the deployment never mounted; the panel now shows the path.
+        code, body = self.management('status')
+        self.assertEqual(code, 200)
+        self.assertEqual(body['config_file'], str(self.config))
+
+    def test_config_path_follows_the_library_by_default(self):
+        # Without the env override the settings file must sit next to the
+        # library, because that directory is the one mounted as a volume.
+        os.environ.pop('CODEX_TZ_CONFIG_FILE', None)
+        code, body = self.management('status')
+        self.assertEqual(code, 200)
+        resolved = pathlib.Path(body['config_file'])
+        self.assertEqual(resolved.name, 'codex-timezone-sync-local.config')
+        self.assertEqual(resolved.parent.resolve(), ROOT.resolve())
+        self.assertNotIn('/CLIProxyAPI/data/', body['config_file'])
+
 
 class TestSettings(PluginTestCase):
     def test_saved_settings_persist_and_reject_unknown_zones(self):
