@@ -66,7 +66,9 @@ plugins:
 | 启用时区改写 | 开 | 关闭后完全不改动请求 |
 | 记录最近改写 | 开 | 仅内存保留 20 条，不落盘 |
 
-配置文件 `codex-timezone-sync-local.config` 位于 CPA 数据目录，可用环境变量 `CODEX_TZ_CONFIG_FILE` 覆盖路径。写入走临时文件 + `rename` 原子替换，权限 `0600`；文件里出现未知时区名时回退默认值。
+配置文件 `codex-timezone-sync-local.config` **默认写在插件动态库所在目录**（即 CPA 的 `plugins` 目录），该目录在部署时通常是挂载卷，容器重建后设置仍然保留。可用环境变量 `CODEX_TZ_CONFIG_FILE` 指定其他路径；面板底部会显示当前实际使用的文件路径。
+
+写入走临时文件 + `rename` 原子替换，权限 `0600`；文件里出现未知时区名时回退默认值。
 
 ## 管理 API
 
