@@ -255,7 +255,10 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
   const combos=[];
 
   function applyTheme(){
-    document.documentElement.setAttribute('data-theme',window.__tzTheme());
+    const next=window.__tzTheme();
+    if(document.documentElement.getAttribute('data-theme')!==next){
+      document.documentElement.setAttribute('data-theme',next);
+    }
   }
 
   function watchTheme(){
@@ -267,6 +270,10 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
     window.addEventListener('storage',applyTheme);
     window.addEventListener('focus',applyTheme);
     document.addEventListener('visibilitychange',applyTheme);
+    // Only follow the host when actually framed. Standalone, window.parent is
+    // this same document, and observing it would feed applyTheme() its own
+    // writes in an endless loop.
+    if(window.parent===window)return;
     try {
       new MutationObserver(applyTheme).observe(
         window.parent.document.documentElement,
