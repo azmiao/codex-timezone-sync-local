@@ -2,7 +2,7 @@
 
 用于 [CLIProxyAPI（CPA）](https://github.com/router-for-me/CLIProxyAPI) 的 Codex 请求时区校正插件。内置离线 IANA 时区表，在管理面板选两个下拉框，即可把请求里的时区与日期改写为目标时区。
 
-**v0.7.1 · 插件 ID `codex-timezone-sync-local` · Linux / macOS / Windows（amd64 + arm64）· CPA C ABI v1**
+**v0.7.2 · 插件 ID `codex-timezone-sync-local` · Linux / macOS / Windows（amd64 + arm64）· CPA C ABI v1**
 
 ## 修改自原仓库
 
@@ -12,7 +12,7 @@
 
 | 主要变更 | 说明 |
 | --- | --- |
-| 内置离线时区表 | 597 个 IANA 时区编译进动态库，运行时零外部依赖，不联网 |
+| 内置离线时区表 | 554 个 IANA 时区编译进动态库，运行时零外部依赖，不联网 |
 | 双下拉框配置 | 直接选「本地时区」与「目标时区」，不再按出口 IP 自动探测 |
 | 去掉宿主机依赖 | 无需辅助进程、无需 Unix Socket、无需状态文件 |
 | 面板轻量化 | 只保留时区选择、时间对照、启用开关、最近改写与自检 |
@@ -22,6 +22,15 @@
 原版的请求统计、模型一致性监控与失败请求日志归档未保留。
 
 > 原仓库未声明许可证；本仓库仅对自身改动以 [MIT](LICENSE) 授权。
+
+## v0.7.2 变更
+
+下拉框改为默认展示全部时区，并支持按国家、城市、中文名搜索：
+
+- 打开下拉框直接列出全部 554 个时区，不再只显示前 60 条，底部提示总数或当前匹配数。
+- 新增 348 条别名，覆盖 105 个时区。搜 `japan`、`日本`、`usa`、`canada` 这类不出现在 IANA id 里的名称也能命中；跨多时区的国家会一次列出全部时区。
+- 容忍 1–2 个拼写错误，`japen` → `Asia/Tokyo`、`germny` → `Europe/Berlin`。
+- 亮色主题改用宿主的纯白配色（`#ffffff`）。CPA 的 `auto` 主题在浅色系统下解析为纯白而非暖纸色，旧版面板因此比周围页面偏黄；暖纸色仍保留给宿主显式选择的 `light` 主题。
 
 ## v0.7.1 变更
 
@@ -82,7 +91,7 @@ plugins:
 | --- | --- | --- |
 | GET | `status` | 当前设置与两侧时区时间 / 偏移 |
 | PUT | `settings` | 保存设置 |
-| GET | `timezones` | 时区候选（597 项） |
+| GET | `timezones` | 时区候选（554 项） |
 | GET | `events` | 最近 20 条改写记录 |
 | POST | `events/clear` | 清空记录 |
 | POST | `selftest` | 用样例请求演练改写 |
@@ -103,4 +112,4 @@ make test-tz   # 时区表校验（需 pip install tzdata）
 uv run --with tzdata python tools/gen_tz_table.py
 ```
 
-发布流程在五个平台原生编译并跑测试，以 `v0.7.1` 这类 tag 发布 Release，附 `checksums.txt`。
+发布流程在五个平台原生编译并跑测试，以 `v0.7.2` 这类 tag 发布 Release，附 `checksums.txt`。
