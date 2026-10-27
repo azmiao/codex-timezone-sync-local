@@ -2,7 +2,7 @@
 
 用于 [CLIProxyAPI（CPA）](https://github.com/router-for-me/CLIProxyAPI) 的 Codex 请求时区校正插件。内置离线 IANA 时区表，在管理面板选两个下拉框，即可把请求里的时区与日期改写为目标时区。
 
-**v0.7.2 · 插件 ID `codex-timezone-sync-local` · Linux / macOS / Windows（amd64 + arm64）· CPA C ABI v1**
+**v0.7.3 · 插件 ID `codex-timezone-sync-local` · Linux / macOS / Windows（amd64 + arm64）· CPA C ABI v1**
 
 ## 修改自原仓库
 
@@ -23,6 +23,31 @@
 
 > 原仓库未声明许可证；本仓库仅对自身改动以 [MIT](LICENSE) 授权。
 
+## v0.7.3 变更
+
+修复 v0.7.1 之后仍然存在的「重启后设置回到默认值」问题。
+
+根因在宿主加载插件的方式：CPA 会把插件动态库**先复制到临时目录**（`/tmp/cliproxy-pluginhost/pid-N/`）再加载。v0.7.1 改用「插件动态库所在目录」，取到的正是这个临时目录，配置因此写在容器内的 `/tmp` 下——保存当时看起来正常，容器一重启 `/tmp` 被清空，设置就回到默认值。
+
+现在改为按顺序探测候选目录，取第一个「存在、可写、且不在易失存储里」的：
+
+1. 环境变量 `CODEX_TZ_CONFIG_DIR` / `CODEX_TZ_CONFIG_FILE`（每次读取都重新求值）
+2. `<宿主可执行文件目录>/plugins` —— 容器部署下即 `/CLIProxyAPI/plugins`，对应宿主机的 `plugins-dir` 挂载卷
+3. `<宿主可执行文件目录>/data`
+4. 插件动态库所在目录（仅当宿主原地加载时有效）
+5. `/CLIProxyAPI/plugins`、`/CLIProxyAPI/data`（宿主改用 helper 进程加载时，可执行文件路径也会指向临时目录，此时靠容器固定布局兜底）
+6. `$XDG_CONFIG_HOME`、`$HOME/.config`
+
+其中易失存储指 `/tmp`、`/var/tmp`、`/dev/shm`、`/run/user`、macOS `/var/folders` 与 Windows `%TEMP%`。
+
+配套改动：
+
+- 首次运行时自动把旧位置（临时目录里）的配置迁移到新位置，迁移成功后才删除旧文件，升级后无需重新配置。
+- 管理面板底部显示配置文件的实际路径；目录不可写或路径落在临时目录时给出警告，不必等重启才发现设置会丢。
+- `status` 接口新增 `config_writable` 字段。
+- 修复 Windows 下 `plugin_getenv` 只能读取两个固定变量名的问题，现在任意变量名都可用。
+- 修复并发请求下配置路径缓冲区被互相覆盖的问题。
+
 ## v0.7.2 变更
 
 下拉框改为默认展示全部时区，并支持按国家、城市、中文名搜索：
@@ -34,7 +59,7 @@
 
 ## v0.7.1 变更
 
-修复容器部署下「重启后设置回到默认值」的问题。旧版把配置固定写到 `/CLIProxyAPI/data`，该目录在多数 compose 部署里没有挂载，因此容器一重建文件就丢失。现在默认写到插件动态库所在目录，面板底部也会显示实际路径。
+修复容器部署下「重启后设置回到默认值」的问题。旧版把配置固定写到 `/CLIProxyAPI/data`，该目录在多数 compose 部署里没有挂载，因此容器一重建文件就丢失。改为按可执行文件位置探测可写目录，面板底部也会显示实际路径。（当时选定的「插件动态库所在目录」仍不持久，v0.7.3 进一步修正。）
 
 ## 功能
 
@@ -79,7 +104,7 @@ plugins:
 | 启用时区改写 | 开 | 关闭后完全不改动请求 |
 | 记录最近改写 | 开 | 仅内存保留 20 条，不落盘 |
 
-配置文件 `codex-timezone-sync-local.config` **默认写在插件动态库所在目录**（即 CPA 的 `plugins` 目录），该目录在部署时通常是挂载卷，容器重建后设置仍然保留。可用环境变量 `CODEX_TZ_CONFIG_FILE` 指定其他路径；面板底部会显示当前实际使用的文件路径。
+配置文件 `codex-timezone-sync-local.config` **默认写在 `<宿主可执行文件目录>/plugins`**（容器部署下即 `/CLIProxyAPI/plugins`，对应宿主机的 `plugins-dir` 挂载卷），容器重建后设置仍然保留。可用环境变量 `CODEX_TZ_CONFIG_DIR` 指定目录，或 `CODEX_TZ_CONFIG_FILE` 指定完整路径；面板底部会显示当前实际使用的文件路径。
 
 写入走临时文件 + `rename` 原子替换，权限 `0600`；文件里出现未知时区名时回退默认值。
 
@@ -112,4 +137,4 @@ make test-tz   # 时区表校验（需 pip install tzdata）
 uv run --with tzdata python tools/gen_tz_table.py
 ```
 
-发布流程在五个平台原生编译并跑测试，以 `v0.7.2` 这类 tag 发布 Release，附 `checksums.txt`。
+发布流程在五个平台原生编译并跑测试，以 `v0.7.3` 这类 tag 发布 Release，附 `checksums.txt`。
