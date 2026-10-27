@@ -13,7 +13,7 @@ permissions:
   contents: write
 
 env:
-  PLUGIN_VERSION: 0.7.2
+  PLUGIN_VERSION: 0.7.3
 
 jobs:
   build:
@@ -101,6 +101,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
+          cat > notes.md <<'NOTES'
+          Codex 时区同步插件。内置离线 IANA 时区表，管理面板直接选择本地与目标时区，无需宿主机辅助服务、状态文件或外网访问。支持 Linux amd64 / arm64、macOS Intel / Apple Silicon 和 Windows amd64。
+
+          v0.7.3 修复了容器重启后设置回到默认值的问题：配置改写到宿主可执行文件目录下的 plugins 子目录（容器部署即 `/CLIProxyAPI/plugins`），该目录在部署时通常已挂载为卷。面板底部会显示实际使用的配置文件路径，也可用 `CODEX_TZ_CONFIG_DIR` 或 `CODEX_TZ_CONFIG_FILE` 指定位置。
+          NOTES
           gh release create "${GITHUB_REF_NAME}" dist/*.zip dist/checksums.txt \
             --title "Codex 离线时区同步 ${GITHUB_REF_NAME}" \
-            --notes "Codex 时区同步插件。内置离线 IANA 时区表，管理面板直接选择本地与目标时区，无需宿主机辅助服务、状态文件或外网访问。支持 Linux amd64 / arm64、macOS Intel / Apple Silicon 和 Windows amd64。"
+            --notes-file notes.md
