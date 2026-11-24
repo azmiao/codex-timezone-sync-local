@@ -2,7 +2,7 @@
 
 用于 [CLIProxyAPI（CPA）](https://github.com/router-for-me/CLIProxyAPI) 的 Codex 请求时区校正插件。内置离线 IANA 时区表，在管理面板选两个下拉框，即可把请求里的时区与日期改写为目标时区。
 
-**v0.7.4 · 插件 ID `codex-timezone-sync-local` · Linux / macOS / Windows（amd64 + arm64）· CPA C ABI v1**
+**v0.7.5 · 插件 ID `codex-timezone-sync-local` · Linux / macOS / Windows（amd64 + arm64）· CPA C ABI v1**
 
 ## 修改自原仓库
 
@@ -12,7 +12,7 @@
 
 | 主要变更 | 说明 |
 | --- | --- |
-| 内置离线时区表 | 554 个 IANA 时区编译进动态库，运行时零外部依赖，不联网 |
+| 内置离线时区表 | 597 个 IANA 时区编译进动态库，运行时零外部依赖，不联网 |
 | 双下拉框配置 | 直接选「本地时区」与「目标时区」，不再按出口 IP 自动探测 |
 | 去掉宿主机依赖 | 无需辅助进程、无需 Unix Socket、无需状态文件 |
 | 面板轻量化 | 只保留时区选择、时间对照、启用开关、最近改写与自检 |
@@ -22,6 +22,12 @@
 原版的请求统计、模型一致性监控与失败请求日志归档未保留。
 
 > 原仓库未声明许可证；本仓库仅对自身改动以 [MIT](LICENSE) 授权。
+
+## v0.7.5 变更
+
+- 内置时区表更新为 IANA `2026f`，修正 `America/Havana` 与 `Cuba` 的偏移规则。
+- 生成与 CI 校验共用 `requirements-tzdata.txt` 中固定的 `tzdata==2026.6`，避免上游发布新数据后校验依赖自动漂移。
+- 生成脚本只读取该依赖提供的时区数据，不再混用宿主机的 `zoneinfo`；修复 v0.7.4 的时区校验失败，并保留其自动授权功能。
 
 ## v0.7.4 变更
 
@@ -122,7 +128,7 @@ plugins:
 | --- | --- | --- |
 | GET | `status` | 当前设置与两侧时区时间 / 偏移 |
 | PUT | `settings` | 保存设置 |
-| GET | `timezones` | 时区候选（554 项） |
+| GET | `timezones` | 时区候选（597 项） |
 | GET | `events` | 最近 20 条改写记录 |
 | POST | `events/clear` | 清空记录 |
 | POST | `selftest` | 用样例请求演练改写 |
@@ -130,8 +136,9 @@ plugins:
 ## 编译与测试
 
 ```bash
+python -m pip install -r requirements-tzdata.txt
 make test      # 插件契约测试
-make test-tz   # 时区表校验（需 pip install tzdata）
+make test-tz   # 时区表校验
 ```
 
 - `test_plugin.py`：通过 C ABI 调用编译产物，覆盖注册、面板、三类请求载体改写、设置校验与自检。
@@ -140,7 +147,7 @@ make test-tz   # 时区表校验（需 pip install tzdata）
 时区表由 `tools/gen_tz_table.py` 生成并提交，构建与运行都不需要 tzdata：
 
 ```bash
-uv run --with tzdata python tools/gen_tz_table.py
+uv run --with-requirements requirements-tzdata.txt python tools/gen_tz_table.py
 ```
 
-发布流程在五个平台原生编译并跑测试，以 `v0.7.4` 这类 tag 发布 Release，附 `checksums.txt`。
+发布流程在五个平台原生编译并跑测试，以 `v0.7.5` 这类 tag 发布 Release，附 `checksums.txt`。

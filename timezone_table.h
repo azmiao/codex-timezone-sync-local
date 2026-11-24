@@ -2,7 +2,7 @@
  * "rule" zones carry a POSIX TZ string valid for any instant.
  * "list" zones carry explicit transitions covering 2024-2045.
  * Offsets and abbreviations are resolved at run time by timezone.c. */
-#define TZ_TABLE_IANA_VERSION "2026e"
+#define TZ_TABLE_IANA_VERSION "2026f"
 #define TZ_TABLE_WINDOW_START 1704067200LL
 #define TZ_TABLE_WINDOW_END 2366841600LL
 
@@ -48,6 +48,50 @@ static const tz_row tz_rows_America_Edmonton[7] = {
   {1762070400LL, -25200, "MST"},
   {1772960400LL, -21600, "MDT"},
   {1793520000LL, -21600, "CST"},
+};
+
+static const tz_row tz_rows_America_Havana[41] = {
+  {1704067200LL, -18000, "CST"},
+  {1710046800LL, -14400, "CDT"},
+  {1730610000LL, -18000, "CST"},
+  {1741496400LL, -14400, "CDT"},
+  {1762059600LL, -18000, "CST"},
+  {1772946000LL, -14400, "CDT"},
+  {1825563600LL, -18000, "CST"},
+  {1836450000LL, -14400, "CDT"},
+  {1857013200LL, -18000, "CST"},
+  {1867899600LL, -14400, "CDT"},
+  {1888462800LL, -18000, "CST"},
+  {1899349200LL, -14400, "CDT"},
+  {1919912400LL, -18000, "CST"},
+  {1930798800LL, -14400, "CDT"},
+  {1951362000LL, -18000, "CST"},
+  {1962853200LL, -14400, "CDT"},
+  {1983416400LL, -18000, "CST"},
+  {1994302800LL, -14400, "CDT"},
+  {2014866000LL, -18000, "CST"},
+  {2025752400LL, -14400, "CDT"},
+  {2046315600LL, -18000, "CST"},
+  {2057202000LL, -14400, "CDT"},
+  {2077765200LL, -18000, "CST"},
+  {2088651600LL, -14400, "CDT"},
+  {2109214800LL, -18000, "CST"},
+  {2120101200LL, -14400, "CDT"},
+  {2140664400LL, -18000, "CST"},
+  {2152155600LL, -14400, "CDT"},
+  {2172718800LL, -18000, "CST"},
+  {2183605200LL, -14400, "CDT"},
+  {2204168400LL, -18000, "CST"},
+  {2215054800LL, -14400, "CDT"},
+  {2235618000LL, -18000, "CST"},
+  {2246504400LL, -14400, "CDT"},
+  {2267067600LL, -18000, "CST"},
+  {2277954000LL, -14400, "CDT"},
+  {2298517200LL, -18000, "CST"},
+  {2309403600LL, -14400, "CDT"},
+  {2329966800LL, -18000, "CST"},
+  {2341458000LL, -14400, "CDT"},
+  {2362021200LL, -18000, "CST"},
 };
 
 static const tz_row tz_rows_America_Inuvik[7] = {
@@ -297,6 +341,50 @@ static const tz_row tz_rows_Canada_Pacific[7] = {
   {1793523600LL, -25200, "MST"},
 };
 
+static const tz_row tz_rows_Cuba[41] = {
+  {1704067200LL, -18000, "CST"},
+  {1710046800LL, -14400, "CDT"},
+  {1730610000LL, -18000, "CST"},
+  {1741496400LL, -14400, "CDT"},
+  {1762059600LL, -18000, "CST"},
+  {1772946000LL, -14400, "CDT"},
+  {1825563600LL, -18000, "CST"},
+  {1836450000LL, -14400, "CDT"},
+  {1857013200LL, -18000, "CST"},
+  {1867899600LL, -14400, "CDT"},
+  {1888462800LL, -18000, "CST"},
+  {1899349200LL, -14400, "CDT"},
+  {1919912400LL, -18000, "CST"},
+  {1930798800LL, -14400, "CDT"},
+  {1951362000LL, -18000, "CST"},
+  {1962853200LL, -14400, "CDT"},
+  {1983416400LL, -18000, "CST"},
+  {1994302800LL, -14400, "CDT"},
+  {2014866000LL, -18000, "CST"},
+  {2025752400LL, -14400, "CDT"},
+  {2046315600LL, -18000, "CST"},
+  {2057202000LL, -14400, "CDT"},
+  {2077765200LL, -18000, "CST"},
+  {2088651600LL, -14400, "CDT"},
+  {2109214800LL, -18000, "CST"},
+  {2120101200LL, -14400, "CDT"},
+  {2140664400LL, -18000, "CST"},
+  {2152155600LL, -14400, "CDT"},
+  {2172718800LL, -18000, "CST"},
+  {2183605200LL, -14400, "CDT"},
+  {2204168400LL, -18000, "CST"},
+  {2215054800LL, -14400, "CDT"},
+  {2235618000LL, -18000, "CST"},
+  {2246504400LL, -14400, "CDT"},
+  {2267067600LL, -18000, "CST"},
+  {2277954000LL, -14400, "CDT"},
+  {2298517200LL, -18000, "CST"},
+  {2309403600LL, -14400, "CDT"},
+  {2329966800LL, -18000, "CST"},
+  {2341458000LL, -14400, "CDT"},
+  {2362021200LL, -18000, "CST"},
+};
+
 static const tz_entry tz_table[] = {
   {"Africa/Abidjan", "GMT0", NULL, 0},
   {"Africa/Accra", "GMT0", NULL, 0},
@@ -424,7 +512,7 @@ static const tz_entry tz_table[] = {
   {"America/Guayaquil", "<-05>5", NULL, 0},
   {"America/Guyana", "<-04>4", NULL, 0},
   {"America/Halifax", "AST4ADT,M3.2.0,M11.1.0", NULL, 0},
-  {"America/Havana", "CST5CDT,M3.2.0/0,M11.1.0/1", NULL, 0},
+  {"America/Havana", NULL, tz_rows_America_Havana, 41},
   {"America/Hermosillo", "MST7", NULL, 0},
   {"America/Indiana/Indianapolis", "EST5EDT,M3.2.0,M11.1.0", NULL, 0},
   {"America/Indiana/Knox", "CST6CDT,M3.2.0,M11.1.0", NULL, 0},
@@ -684,7 +772,7 @@ static const tz_entry tz_table[] = {
   {"Canada/Yukon", "MST7", NULL, 0},
   {"Chile/Continental", "<-04>4<-03>,M9.1.6/24,M4.1.6/24", NULL, 0},
   {"Chile/EasterIsland", "<-06>6<-05>,M9.1.6/22,M4.1.6/22", NULL, 0},
-  {"Cuba", "CST5CDT,M3.2.0/0,M11.1.0/1", NULL, 0},
+  {"Cuba", NULL, tz_rows_Cuba, 41},
   {"EET", "EET-2EEST,M3.5.0/3,M10.5.0/4", NULL, 0},
   {"EST", "EST5", NULL, 0},
   {"EST5EDT", "EST5EDT,M3.2.0,M11.1.0", NULL, 0},

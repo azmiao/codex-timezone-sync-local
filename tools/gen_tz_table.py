@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate timezone_table.h from the IANA tzdata database.
 
-Usage: uv run --with tzdata python tools/gen_tz_table.py
+Usage: uv run --with-requirements requirements-tzdata.txt python tools/gen_tz_table.py
 
 The generated header is committed, so the native plugin needs neither tzdata at
 build time nor any host zoneinfo/network access at run time.
@@ -289,9 +289,11 @@ def build_rows(zone):
 
 
 def main():
+    # Footers and reference probes must use the same wheel, not host zoneinfo.
+    zoneinfo.reset_tzpath([str(tzif_root())])
     available = sorted(zoneinfo.available_timezones())
     if len(available) < 400:
-        raise SystemExit('tzdata missing; run with --with tzdata')
+        raise SystemExit('tzdata missing; install requirements-tzdata.txt')
     rules, lists = [], []
     for zone in available:
         if zone in SKIP:
