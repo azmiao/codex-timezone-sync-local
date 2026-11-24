@@ -2,7 +2,7 @@
 
 用于 [CLIProxyAPI（CPA）](https://github.com/router-for-me/CLIProxyAPI) 的 Codex 请求时区校正插件。内置离线 IANA 时区表，在管理面板选两个下拉框，即可把请求里的时区与日期改写为目标时区。
 
-**v0.7.3 · 插件 ID `codex-timezone-sync-local` · Linux / macOS / Windows（amd64 + arm64）· CPA C ABI v1**
+**v0.7.4 · 插件 ID `codex-timezone-sync-local` · Linux / macOS / Windows（amd64 + arm64）· CPA C ABI v1**
 
 ## 修改自原仓库
 
@@ -22,6 +22,12 @@
 原版的请求统计、模型一致性监控与失败请求日志归档未保留。
 
 > 原仓库未声明许可证；本仓库仅对自身改动以 [MIT](LICENSE) 授权。
+
+## v0.7.4 变更
+
+- 内嵌面板打开后自动读取 CPA 管理界面的 `localStorage['cli-proxy-auth']` 并授权，兼容明文、`enc::v1::` 与两种 `enc::v2::` 存储格式；只要已保存有效密钥，就不再依赖 `rememberPassword` 标记。
+- 校验凭据中的 `apiBase` 与当前 CPA 地址及反向代理路径前缀一致，避免误用其他实例的密钥。
+- 密钥仅用于当前页面的管理请求，插件不写入浏览器存储；没有凭据、格式不兼容或授权失败时仍可手动连接。
 
 ## v0.7.3 变更
 
@@ -137,4 +143,4 @@ make test-tz   # 时区表校验（需 pip install tzdata）
 uv run --with tzdata python tools/gen_tz_table.py
 ```
 
-发布流程在五个平台原生编译并跑测试，以 `v0.7.3` 这类 tag 发布 Release，附 `checksums.txt`。
+发布流程在五个平台原生编译并跑测试，以 `v0.7.4` 这类 tag 发布 Release，附 `checksums.txt`。

@@ -267,7 +267,10 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
 <script>
 'use strict';
 (() => {
-  const base='/v0/management/plugins/codex-timezone-sync-local/';
+  const marker='/v0/resource/plugins/codex-timezone-sync-local/';
+  const index=location.pathname.indexOf(marker);
+  const root=index<0?'':location.pathname.slice(0,index);
+  const base=root+'/v0/management/plugins/codex-timezone-sync-local/';
   const $=id=>document.getElementById(id);
   let key='';
   let zones=[];
@@ -307,14 +310,24 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
     try {
       const stored=localStorage.getItem('cli-proxy-auth');
       if(!stored)return '';
-      let decoded=stored;
-      if(stored.startsWith('enc::v1::')){
-        const bytes=Uint8Array.from(atob(stored.slice(9)),c=>c.charCodeAt(0));
-        const secret=new TextEncoder().encode('cli-proxy-api-webui::secure-storage|'+location.host+'|'+navigator.userAgent);
-        decoded=new TextDecoder('utf-8',{fatal:true}).decode(bytes.map((b,i)=>b^secret[i%secret.length]));
-      }
-      const state=JSON.parse(decoded)?.state;
-      return state?.rememberPassword===true && typeof state.managementKey==='string'?state.managementKey:'';
+      const prefix=/^enc::v([12])::/.exec(stored);
+      let saved;
+      if(prefix){
+        const bytes=Uint8Array.from(atob(stored.slice(prefix[0].length)),c=>c.charCodeAt(0));
+        const scopes=prefix[1]==='1'?[location.host+'|'+navigator.userAgent]:[location.host,'v2|'+location.host];
+        for(const scope of scopes){
+          const secret=new TextEncoder().encode('cli-proxy-api-webui::secure-storage|'+scope);
+          try {
+            saved=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes.map((b,i)=>b^secret[i%secret.length])));
+            break;
+          } catch {}
+        }
+      } else saved=JSON.parse(stored);
+      const state=saved?.state;
+      const savedKey=state?.managementKey;
+      if(typeof savedKey!=='string'||!savedKey.trim())return '';
+      if(state.apiBase&&new URL(state.apiBase,location.href).href.replace(/\/+$/,'')!==location.origin+root)return '';
+      return savedKey.trim();
     } catch { return ''; }
   }
 
@@ -1106,9 +1119,9 @@ document.documentElement.setAttribute('data-theme',window.__tzTheme());
   }));
 
   watchTheme();
-  $('management-key').value=rememberedKey()?'':'';
-  if(rememberedKey()){
-    key=rememberedKey();
+  key=rememberedKey();
+  if(key){
+    $('connection').textContent='正在使用 CPA 登录凭据自动连接…';
     refresh();
   }
 })();
