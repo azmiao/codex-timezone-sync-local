@@ -2,7 +2,7 @@
 
 用于 [CLIProxyAPI（CPA）](https://github.com/router-for-me/CLIProxyAPI) 的 Codex 请求时区校正插件。内置离线 IANA 时区表，在管理面板选两个下拉框，即可把请求里的时区与日期改写为目标时区。
 
-**v0.7.5 · 插件 ID `codex-timezone-sync-local` · Linux / macOS / Windows（amd64 + arm64）· CPA C ABI v1**
+**v0.7.6 · 插件 ID `codex-timezone-sync-local` · Linux / macOS / Windows（amd64 + arm64）· CPA C ABI v1**
 
 ## 修改自原仓库
 
@@ -22,6 +22,12 @@
 原版的请求统计、模型一致性监控与失败请求日志归档未保留。
 
 > 原仓库未声明许可证；本仓库仅对自身改动以 [MIT](LICENSE) 授权。
+
+## v0.7.6 变更
+
+- 补齐 Windows arm64 发布包，覆盖 Linux、macOS 和 Windows 的 amd64 / arm64 六个平台。
+- Windows arm64 使用原生 ARM64 runner、CLANGARM64 编译器和 ARM64 Python 执行插件 ABI 契约测试；Windows 打包时校验 PE 架构，拒绝与 ZIP 平台名不符的 DLL。
+- 发布流程要求六个 ZIP 及其 SHA-256 校验值全部存在，修复插件商店提出的完整平台支持问题。
 
 ## v0.7.5 变更
 
@@ -139,9 +145,11 @@ plugins:
 python -m pip install -r requirements-tzdata.txt
 make test      # 插件契约测试
 make test-tz   # 时区表校验
+python test_package_release.py  # Windows 打包契约测试
 ```
 
 - `test_plugin.py`：通过 C ABI 调用编译产物，覆盖注册、面板、三类请求载体改写、设置校验与自检。
+- `test_package_release.py`：验证 Windows 归档命名、动态库根目录布局及 amd64 / arm64 架构不匹配时的拒绝行为。
 - `test_timezone_rules.py`：与官方 `tzdata` 在 2024–2045 全窗口逐时区比对偏移与缩写。
 
 时区表由 `tools/gen_tz_table.py` 生成并提交，构建与运行都不需要 tzdata：
@@ -150,4 +158,4 @@ make test-tz   # 时区表校验
 uv run --with-requirements requirements-tzdata.txt python tools/gen_tz_table.py
 ```
 
-发布流程在五个平台原生编译并跑测试，以 `v0.7.5` 这类 tag 发布 Release，附 `checksums.txt`。
+发布流程在六个平台原生编译并跑测试，以 `v0.7.6` 这类 tag 发布 Release，附 `checksums.txt`。

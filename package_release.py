@@ -10,6 +10,7 @@ PLATFORMS = {
     "darwin_amd64": "codex-timezone-sync-local.dylib",
     "darwin_arm64": "codex-timezone-sync-local.dylib",
     "windows_amd64": "codex-timezone-sync-local.dll",
+    "windows_arm64": "codex-timezone-sync-local.dll",
 }
 
 def main():
@@ -21,6 +22,18 @@ def main():
     library = pathlib.Path(PLATFORMS[platform])
     if not library.is_file():
         raise SystemExit(f"Missing compiled binary: {library}")
+    if platform.startswith("windows_"):
+        with library.open("rb") as binary:
+            if binary.read(2) != b"MZ":
+                raise SystemExit(f"Not a PE library: {library}")
+            binary.seek(0x3c)
+            pe_offset = int.from_bytes(binary.read(4), "little")
+            binary.seek(pe_offset)
+            header = binary.read(6)
+        expected = 0xAA64 if platform == "windows_arm64" else 0x8664
+        if (len(header) != 6 or header[:4] != b"PE\0\0"
+                or int.from_bytes(header[4:], "little") != expected):
+            raise SystemExit(f"Expected a {platform} PE library: {library}")
     output = pathlib.Path("dist") / f"codex-timezone-sync-local_{version}_{platform}.zip"
     output.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:

@@ -13,7 +13,7 @@ permissions:
   contents: write
 
 env:
-  PLUGIN_VERSION: 0.7.5
+  PLUGIN_VERSION: 0.7.6
 
 jobs:
   build:
@@ -32,21 +32,31 @@ jobs:
             runner: macos-15
           - platform: windows_amd64
             runner: windows-2022
+            msystem: UCRT64
+            compiler: gcc
+            compiler-package: mingw-w64-ucrt-x86_64-gcc
+            ldflags: -static-libgcc
+          - platform: windows_arm64
+            runner: windows-11-arm
+            python: '3.13'
+            msystem: CLANGARM64
+            compiler: clang
+            compiler-package: mingw-w64-clang-aarch64-clang
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python || '3.12' }}
       - name: Install tzdata for the table validation test
         run: python -m pip install -r requirements-tzdata.txt
       - uses: msys2/setup-msys2@v2
         if: runner.os == 'Windows'
         with:
-          msystem: UCRT64
+          msystem: ${{ matrix.msystem }}
           update: true
           install: >-
-            mingw-w64-ucrt-x86_64-gcc
+            ${{ matrix.compiler-package }}
             make
       - name: Validate the committed timezone table against tzdata
         run: python test_timezone_rules.py
@@ -55,16 +65,18 @@ jobs:
       - name: Build and run plugin tests (Linux/macOS)
         if: runner.os != 'Windows'
         run: make test PYTHON=python
-      - name: Build plugin (Windows UCRT64)
+      - name: Build plugin (Windows native toolchain)
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: >-
-          gcc -O2 -std=c11 -Wall -Wextra -Werror -shared -o codex-timezone-sync-local.dll
+          ${{ matrix.compiler }} -O2 -std=c11 -Wall -Wextra -Werror -shared -o codex-timezone-sync-local.dll
           plugin.c settings.c events.c json.c rewrite.c timezone.c platform.c
-          -static-libgcc -lws2_32
+          ${{ matrix.ldflags }} -lws2_32
       - name: Run plugin tests (Windows)
         if: runner.os == 'Windows'
         run: python test_plugin.py
+      - name: Validate release packaging contracts
+        run: python test_package_release.py
       - name: Assemble CPA-compatible plugin ZIP
         run: python package_release.py ${{ env.PLUGIN_VERSION }} ${{ matrix.platform }}
       - uses: actions/upload-artifact@v4
@@ -83,17 +95,17 @@ jobs:
           pattern: plugin-*
           merge-multiple: true
           path: dist
-      - name: Generate and verify five-platform checksums
+      - name: Generate and verify six-platform checksums
         shell: bash
         run: |
           set -euo pipefail
           version="${PLUGIN_VERSION}"
           test "${GITHUB_REF_NAME}" = "v${version}"
           cd dist
-          for platform in linux_amd64 linux_arm64 darwin_amd64 darwin_arm64 windows_amd64; do
+          for platform in linux_amd64 linux_arm64 darwin_amd64 darwin_arm64 windows_amd64 windows_arm64; do
             test -s "codex-timezone-sync-local_${version}_${platform}.zip"
           done
-          test "$(find . -name '*.zip' -type f | wc -l)" -eq 5
+          test "$(find . -name '*.zip' -type f | wc -l)" -eq 6
           sha256sum *.zip > checksums.txt
           sha256sum -c checksums.txt
       - name: Create GitHub release
@@ -102,9 +114,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           cat > notes.md <<'NOTES'
-          Codex 时区同步插件。内置离线 IANA 时区表，管理面板直接选择本地与目标时区，无需宿主机辅助服务、状态文件或外网访问。支持 Linux amd64 / arm64、macOS Intel / Apple Silicon 和 Windows amd64。
+          Codex 时区同步插件。内置离线 IANA 时区表，管理面板直接选择本地与目标时区，无需宿主机辅助服务、状态文件或外网访问。支持 Linux、macOS 和 Windows 的 amd64 / arm64，共六个平台。
 
-          v0.7.5 修复了时区表与 CI 校验依赖版本不一致导致的发布失败：内置时区表更新为 IANA 2026f，修正 America/Havana 与 Cuba 的时区偏移；生成和校验共用固定的 tzdata==2026.6，生成时也只使用该版本的数据，不受宿主机 zoneinfo 影响。本版本包含 v0.7.4 的管理面板自动授权功能。
+          v0.7.6 补齐 Windows arm64 发布包：使用 Windows 11 ARM64 原生 runner、CLANGARM64 编译器和 ARM64 Python 运行插件 ABI 契约测试。Windows ZIP 打包前校验 PE 架构，避免把 amd64 DLL 误标为 arm64。六个平台的 ZIP 和 SHA-256 校验文件均由发布流程生成；保留离线时区校正与管理面板自动授权功能。
           NOTES
           gh release create "${GITHUB_REF_NAME}" dist/*.zip dist/checksums.txt \
             --title "Codex 离线时区同步 ${GITHUB_REF_NAME}" \
